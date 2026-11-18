@@ -2,6 +2,7 @@
 const $ = id => document.getElementById(id);
 let token = "", state = null, images = [null, null], imageURLs = [null, null], currentVideo = "", sending = false;
 let db = null;
+let previewSequence = 0, previewTimer = null;
 
 async function api(path, values, retried = false) {
   const response = await fetch(path, {method: values === undefined ? "GET" : "POST", headers: {"X-Studio-Token": token, ...(values === undefined ? {} : {"Content-Type": "application/json"})}, ...(values === undefined ? {} : {body: JSON.stringify(values)})});
@@ -51,6 +52,7 @@ async function setPicture(index, file, persist = true) {
     const store = db.transaction("pictures", "readwrite").objectStore("pictures");
     if (file) store.put(file, index); else store.delete(index);
   }
+  schedulePreview();
 }
 function encode(file) {
   return new Promise((resolve, reject) => {
@@ -60,11 +62,27 @@ function encode(file) {
 }
 function saveDraft() {
   const values = Object.fromEntries(["scene", "speech", "sounds", "seconds"].map(id => [id, $(id).value]));
+  values.direct_prompt = $('direct-prompt').checked;
   try { localStorage.setItem("video-studio-draft", JSON.stringify(values)); } catch (_) { /* Editing works without browser storage. */ }
 }
 function restoreDraft() {
   try { const draft = JSON.parse(localStorage.getItem("video-studio-draft") || "{}"); for (const id of ["scene", "speech", "sounds", "seconds"]) if (typeof draft[id] === "string") $(id).value = draft[id]; } catch (_) {}
+  try { const draft = JSON.parse(localStorage.getItem('video-studio-draft') || '{}'); if (typeof draft.direct_prompt === 'boolean') $('direct-prompt').checked = draft.direct_prompt; } catch (_) {}
 }
+function promptValues() { return {scene:$('scene').value,speech:$('speech').value,sounds:$('sounds').value,direct_prompt:$('direct-prompt').checked,has_end_image:!!images[1]}; }
+function schedulePreview() {
+  const sequence = ++previewSequence;
+  clearTimeout(previewTimer);
+  if (!$('prompt-preview').open) return;
+  // Clear stale text immediately; never present an older response as this draft.
+  $('prompt-preview-text').value = '';
+  $('prompt-preview-text').placeholder = 'Textvorschau wird aktualisiert …';
+  previewTimer = setTimeout(async () => {
+    try { const result = await api('/api/preview-prompt',promptValues()); if(sequence === previewSequence) {$('prompt-preview-text').value=result.prompt; $('prompt-preview-text').placeholder='Hier erscheint dein Text.';} }
+    catch(exc) {if(sequence === previewSequence) $('prompt-preview-text').placeholder=exc.message;}
+  },200);
+}
+$('prompt-preview').addEventListener('toggle',schedulePreview);
 function showVideo(url, seconds) {
   if (currentVideo !== url) { $("video").src = url; currentVideo = url; }
   $("video").hidden = false; $("video-placeholder").hidden = true;
@@ -93,6 +111,8 @@ async function refresh() {
     $("repair").disabled = settingUp || active();
     if (state.setup?.state === "done" && state.ready) $("setup-panel").hidden = true;
     const job = state.job;
+    $('submitted-prompt').hidden = !job?.submitted_prompt;
+    $('submitted-prompt-text').value = job?.submitted_prompt || '';
     if (job) {
       $("job-status").hidden = false;
       $("job-status").classList.toggle("busy", active());
@@ -134,13 +154,14 @@ for (const [index, key] of [[0,"start"],[1,"end"]]) {
   zone.addEventListener("dragleave", () => zone.classList.remove("dragging"));
   zone.addEventListener("drop", event => {event.preventDefault(); zone.classList.remove("dragging"); if (event.dataTransfer.files.length) setPicture(index, event.dataTransfer.files[0]);});
 }
-for (const id of ["scene","speech","sounds","seconds"]) $(id).addEventListener("input", saveDraft);
+for (const id of ["scene","speech","sounds","seconds"]) $(id).addEventListener("input", () => {saveDraft(); schedulePreview();});
+$('direct-prompt').addEventListener('change',() => {saveDraft(); schedulePreview();});
 $("create-form").addEventListener("submit", async event => {
   event.preventDefault(); error("");
   if (!images[0]) {error("Lade zuerst ein Startbild hoch."); $("image-start").focus(); return;}
   sending = true; updateButton(); saveDraft();
   try {
-    const values = {scene:$("scene").value,speech:$("speech").value,sounds:$("sounds").value,seconds:Number($("seconds").value),images:await Promise.all(images.filter(Boolean).map(encode))};
+    const values = {...promptValues(),seconds:Number($("seconds").value),images:await Promise.all(images.filter(Boolean).map(encode))};
     await api("/api/generate", values); await refresh();
   } catch (exc) {error(exc.message);} finally {sending = false; updateButton();}
 });

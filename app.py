@@ -76,17 +76,32 @@ class Studio:
                 "update": {**self.updater.state, "enabled":self.updater.enabled},
                 "download_gb": round(sum(i["size"] for i in self.manifest["models"]) / 1e9, 1)}
 
-    def create(self, values):
-        from engine import build_settings
+    def prompt_inputs(self, values, require_scene=True):
         scene = values.get("scene", "")
         speech = values.get("speech", "")
         sounds = values.get("sounds", "")
         if not all(isinstance(text, str) for text in (scene, speech, sounds)):
             raise ValueError("Bitte überprüfe die Texteingaben.")
-        if not scene.strip():
+        if require_scene and not scene.strip():
             raise ValueError("Beschreibe zuerst, was im Video passieren soll.")
         if len(scene) > 4000 or len(speech) > 8000 or len(sounds) > 600:
             raise ValueError("Die Beschreibung ist zu lang. Kürze sie bitte etwas.")
+        direct_prompt = values.get("direct_prompt", True)
+        if type(direct_prompt) is not bool:
+            raise ValueError("Die Einstellung für die direkte Beschreibung ist ungültig.")
+        return scene, speech, sounds, direct_prompt
+
+    def preview_prompt(self, values):
+        from engine import compose_prompt
+        scene, speech, sounds, direct_prompt = self.prompt_inputs(values, require_scene=False)
+        has_end = values.get("has_end_image", False)
+        if type(has_end) is not bool:
+            raise ValueError("Die Einstellung für das Schlussbild ist ungültig.")
+        return {"prompt":compose_prompt(scene, speech, sounds, direct_prompt, has_end)}
+
+    def create(self, values):
+        from engine import build_settings
+        scene, speech, sounds, direct_prompt = self.prompt_inputs(values)
         images = values.get("images")
         if not isinstance(images, list) or not 1 <= len(images) <= 2:
             raise ValueError("Lade ein oder zwei Bilder hoch.")
@@ -106,8 +121,8 @@ class Studio:
                 path = directory / f"bild-{index + 1}.jpg"
                 normalize_image(value, path)
                 paths.append(path)
-            settings = build_settings(scene, speech, sounds, paths, seconds, secrets.randbelow(2**31))
-            atomic_json(directory / "eingaben.json", {"scene": scene, "speech": speech, "sounds": sounds, "seconds": seconds})
+            settings = build_settings(scene, speech, sounds, paths, seconds, secrets.randbelow(2**31), direct_prompt)
+            atomic_json(directory / "eingaben.json", {"scene": scene, "speech": speech, "sounds": sounds, "seconds": seconds, "direct_prompt":direct_prompt})
             return self.runner.start(job_id, settings, bool(speech.strip() or sounds.strip()))
 
     def begin_setup(self):
@@ -260,6 +275,8 @@ class Handler(BaseHTTPRequestHandler):
             path = urlsplit(self.path).path
             if path == "/api/generate":
                 return self.respond(self.studio.create(values), 202)
+            if path == "/api/preview-prompt":
+                return self.respond(self.studio.preview_prompt(values))
             if path == "/api/cancel":
                 self.studio.runner.cancel()
             elif path == "/api/check-updates":

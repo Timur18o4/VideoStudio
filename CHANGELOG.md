@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.2.1-preview
+
+- Direkte Szenenbeschreibung standardmäßig aktiv; bisherige Stil- und Kleidungsvorgaben sind optional.
+- Vorschau des an WanGP übergebenen Textes mit derselben Logik wie bei der Videoerstellung.
+- Neue Aufträge speichern den tatsächlich übergebenen Text und zeigen ihn in der Oberfläche an.
+- Separat eingegebene Sprache und Geräusche werden nachvollziehbar ergänzt.
+- Mehrzeilige Beschreibungen werden als ein Prompt übergeben; keine automatische Prompt-Umschreibung durch ein zusätzliches Sprachmodell.
+
 ## 0.2.0-preview
 
 - Frei eingebbare Videolänge in ganzen Sekunden ab 1 statt fester Auswahl.

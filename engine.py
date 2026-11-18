@@ -22,18 +22,23 @@ def atomic_json(path: Path, value):
     temporary.replace(path)
 
 
-def build_settings(scene: str, speech: str, sounds: str, images: list[Path], seconds: int, seed: int):
-    from PIL import Image
-    with Image.open(images[0]) as image:
-        width, height = image.size
-    resolution = "512x896" if height > width * 1.15 else "896x512" if width > height * 1.15 else "640x640"
+def compose_prompt(scene: str, speech: str, sounds: str, direct_prompt=True, has_end_image=False):
+    if direct_prompt:
+        # Keep the user's scene verbatim. Only explicitly completed audio fields
+        # add text; there is no language model rewriting this description.
+        prompt = scene
+        if speech.strip():
+            prompt += "\n\nSpoken dialogue in German, with synchronized lip movement: " + json.dumps(speech.strip(), ensure_ascii=False)
+        if sounds.strip():
+            prompt += "\n\nSound design: " + sounds.strip()
+        return prompt
     prompt = (
         "A single continuous photorealistic live-action shot. Preserve the identity, face, "
         "body proportions, clothing and visual appearance of the person in the starting image. "
         "Natural realistic anatomy, coherent motion, consistent facial identity.\n"
         f"Scene and actions (the user's instructions):\n{scene.strip()}\n"
     )
-    if len(images) == 2:
+    if has_end_image:
         prompt += "The shot ends with the framing and pose in the provided ending image.\n"
     if speech.strip():
         # The model generates speech jointly with video; no cloud TTS or extra model.
@@ -44,6 +49,15 @@ def build_settings(scene: str, speech: str, sounds: str, images: list[Path], sec
     else:
         prompt += "No spoken dialogue.\n"
     prompt += f"Sound design: {sounds.strip()}.\n" if sounds.strip() else "Quiet natural ambient sound, no music.\n"
+    return prompt
+
+
+def build_settings(scene: str, speech: str, sounds: str, images: list[Path], seconds: int, seed: int, direct_prompt=True):
+    from PIL import Image
+    with Image.open(images[0]) as image:
+        width, height = image.size
+    resolution = "512x896" if height > width * 1.15 else "896x512" if width > height * 1.15 else "640x640"
+    prompt = compose_prompt(scene, speech, sounds, direct_prompt, len(images) == 2)
     result = {
         "model_type": MODEL, "prompt": prompt, "resolution": resolution,
         "video_length": seconds * 24 + 1, "num_inference_steps": 8,
@@ -51,6 +65,7 @@ def build_settings(scene: str, speech: str, sounds: str, images: list[Path], sec
         "image_start": str(images[0].resolve()), "audio_prompt_type": "",
         "audio_guide": None,
         "repeat_generation": 1, "batch_size": 1,
+        "multi_prompts_gen_type": "FG",
         "sliding_window_size": WINDOW_FRAMES,
         "sliding_window_overlap": WINDOW_OVERLAP,
     }
@@ -112,7 +127,8 @@ class Runner:
             job = self.data / "jobs" / job_id
             atomic_json(job / "settings.json", settings)
             self.current = {"id": job_id, "state": "queued", "message": "Die KI wird gestartet …", "progress": None,
-                            "created": time.time(), "seconds": (settings["video_length"] - 1) // 24}
+                            "created": time.time(), "seconds": (settings["video_length"] - 1) // 24,
+                            "submitted_prompt": settings["prompt"]}
             self.update()
             self.busy = True
             threading.Thread(target=self.run, args=(job, audible), daemon=True).start()

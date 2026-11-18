@@ -2,11 +2,11 @@
 
 Ein kleines Windows-Frontend für lokale KI-Videos mit WanGP und LTX-2.3: ein oder zwei Bilder hochladen, eine Szene beschreiben und bei Bedarf Sprache und Geräusche ergänzen. Die Berechnung läuft auf dem eigenen PC.
 
-**Öffentliche Vorschauversion:** [Windows-Installer herunterladen](https://github.com/Timur18o4/VideoStudio/releases/tag/v0.2.0-preview). Unter „Assets“ die Datei `VideoStudio-Setup-0.2.0-preview.exe` auswählen. Für die Installation der Oberfläche ist kein eigenes Python nötig.
+**Öffentliche Vorschauversion:** [Windows-Installer herunterladen](https://github.com/Timur18o4/VideoStudio/releases/tag/v0.2.1-preview). Unter „Assets“ die Datei `VideoStudio-Setup-0.2.1-preview.exe` auswählen. Für die Installation der Oberfläche ist kein eigenes Python nötig.
 
 ## Benutzung
 
-1. `VideoStudio-Setup-0.2.0-preview.exe` öffnen und installieren.
+1. `VideoStudio-Setup-0.2.1-preview.exe` öffnen und installieren.
 2. **Video Studio** über die Desktopverknüpfung starten. Auf einem neuen PC einmal **KI einrichten** anklicken und den Download abwarten.
 3. Ein Startbild hochladen. Optional ein zweites Bild als gewünschte Schlussaufnahme ergänzen.
 4. Beschreiben, was im Video passieren soll. Bei Bedarf deutschen Sprechtext und Geräusche ergänzen.
@@ -15,6 +15,14 @@ Ein kleines Windows-Frontend für lokale KI-Videos mit WanGP und LTX-2.3: ein od
 Ohne Sprechtext und Geräusche wird das exportierte Video stummgeschaltet. Bilder und Texte bleiben im jeweiligen lokalen Auftrag. Browser-Eingaben werden auf diesem PC gespeichert, damit sie nach dem Neuladen wieder verfügbar sind. Zum vollständigen Beenden gibt es unten **Programm beenden**. Das Schließen des Browserfensters beendet einen laufenden Auftrag nicht.
 
 Das zweite Bild dient als Schlussbild, nicht als beliebige zusätzliche Identitätsreferenz. Die Videolänge lässt sich frei in ganzen Sekunden ab 1 eingeben, beispielsweise 7, 25 oder 90. Die Oberfläche setzt keine feste Höchstdauer. Längere Videos werden automatisch in überlappenden Abschnitten berechnet; Rechenzeit, Speicherbedarf, Übergänge und Identitätsstabilität begrenzen die praktisch sinnvolle Länge. Ein beliebig langer, durchgehend konsistenter Film ist nicht garantiert. Das Programm trainiert kein neues Personenmodell. Die Länge des Sprechtextes muss zur Videolänge passen.
+
+## Direkte Beschreibung und Textvorschau
+
+**Beschreibung unverändert verwenden** ist standardmäßig aktiv. Die Anwendung übernimmt die Szenenbeschreibung einschließlich Zeilenumbrüchen und Leerzeichen unverändert. Es gibt dabei keine zusätzlichen Vorgaben für Fotorealismus, Kleidung, Körperform oder Kamerastil. Separat ausgefüllte Sprechtext- und Geräuschfelder werden als sichtbare Ergänzungen angehängt. Ohne diese beiden Felder wird das exportierte Video weiterhin stummgeschaltet.
+
+Wer die bisherige Unterstützung für eine fotorealistische Szene mit konsistentem Aussehen möchte, kann die Option ausschalten. Unter **Text an die KI ansehen** wird vor dem Start der vollständige Text angezeigt, den die Anwendung an WanGP übergibt. Vorschau und Erstellung verwenden dieselbe Funktion. Bei neuen Aufträgen ist unter **Verwendeter Text dieses Auftrags** außerdem der tatsächlich übergebene Text einsehbar und lokal gespeichert. Bilder werden zusätzlich als visuelle Vorgabe übergeben; Modell und Textencoder verarbeiten diese Eingaben weiterhin nach ihrer Architektur.
+
+In dieser Videooberfläche wird kein Ollama-Promptmodell aufgerufen. Eine automatische Prompt-Umschreibung durch ein Sprachmodell bleibt deaktiviert. Die Anwendung verwendet keine eigene Themen-Sperrliste und fragt keinen externen Moderationsdienst ab. Die direkte Textübergabe ist keine Garantie für beliebige Modellfähigkeiten oder wortgetreue Umsetzung und wird nicht als Entfernung eines Modell-Checkers bezeichnet.
 
 ## Automatische Updates
 

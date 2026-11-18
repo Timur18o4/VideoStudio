@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import Handler, Studio, normalize_image
-from engine import Runner, atomic_json, build_settings
+from engine import Runner, atomic_json, build_settings, compose_prompt
 from setup_engine import download, extract_zip, hardware_check
 from PIL import Image
 
@@ -31,6 +31,18 @@ def picture(width=512, height=896):
 
 
 class Images(unittest.TestCase):
+    def test_direct_description_preserves_unicode_newlines_and_spacing(self):
+        scene='  Eine abstrakte Aquarellszene.\nEin roter Ballon — 红色的气球.  '
+        self.assertEqual(compose_prompt(scene,'',''),scene)
+
+    def test_style_guidance_is_only_added_when_requested(self):
+        scene='Sachliche medizinische Illustration einer erwachsenen Person.'
+        self.assertEqual(compose_prompt(scene,'','',True,True),scene)
+        guided=compose_prompt(scene,'','',False,True)
+        self.assertIn('photorealistic',guided)
+        self.assertIn('clothing',guided)
+        self.assertIn('provided ending image',guided)
+
     def test_invalid_and_too_small_images_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "image.jpg"
@@ -118,6 +130,26 @@ class HTTP(unittest.TestCase):
                 self.request('/api/generate', {"scene":"Sie winkt.","images":[picture()],"seconds":seconds}, {"X-Studio-Token":self.studio.token})
             self.assertEqual(exc.exception.code,400)
         self.assertFalse(list((self.data / "jobs").iterdir()))
+
+    def test_preview_matches_the_submitted_settings(self):
+        for direct in (True,False):
+            inputs={'scene':'  Eine Bleistiftzeichnung.\nLangsame Kamerafahrt.  ','speech':'Hallo.','sounds':'Leiser Wind','direct_prompt':direct,'has_end_image':True}
+            with self.request('/api/preview-prompt',inputs,{'X-Studio-Token':self.studio.token}) as result:
+                preview=json.load(result)['prompt']
+            with patch.object(self.studio.runner,'start',side_effect=lambda job,settings,audible:{'settings':settings}):
+                with self.request('/api/generate',{**inputs,'images':[picture(),picture()],'seconds':7},{'X-Studio-Token':self.studio.token}) as result:
+                    generated=json.load(result)['settings']
+            self.assertEqual(preview,generated['prompt'])
+            self.assertEqual(generated['prompt_enhancer'],'')
+            self.assertEqual(generated['multi_prompts_gen_type'],'FG')
+            self.assertNotIn('direct_prompt',generated)
+            if direct:self.assertTrue(preview.startswith(inputs['scene']))
+
+    def test_prompt_mode_rejects_ambiguous_values(self):
+        for value in ('false',1,None):
+            with self.assertRaises(urllib.error.HTTPError) as exc:
+                self.request('/api/preview-prompt',{'scene':'Eine Szene.','direct_prompt':value},{'X-Studio-Token':self.studio.token})
+            self.assertEqual(exc.exception.code,400)
 
     def test_media_range_and_download_headers(self):
         folder = self.data / "jobs/20261117-123456-1234abcd"
