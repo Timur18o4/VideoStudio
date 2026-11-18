@@ -396,7 +396,18 @@ def main():
     parser.add_argument("--apply-update", type=Path)
     parser.add_argument("--skip-update-once", action="store_true")
     parser.add_argument("--update-token", default="")
+    parser.add_argument('--check-engine-start', type=Path, help=argparse.SUPPRESS)
+    parser.add_argument('--check-settings', type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.check_engine_start:
+        from engine import check_engine_start
+        config_path = args.data / 'config.json'
+        config = json.loads(config_path.read_text(encoding='utf-8')) if config_path.exists() else {}
+        engine = (args.engine or Path(config.get('engine', args.data / 'engine'))).resolve()
+        result = check_engine_start(engine, args.check_engine_start.resolve(), args.check_settings)
+        raise SystemExit(0 if result['ok'] else 1)
+    if args.check_settings:
+        parser.error('--check-settings benötigt --check-engine-start.')
     if args.apply_update:
         from updater import apply_plan
         apply_plan(args.apply_update)

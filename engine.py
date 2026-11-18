@@ -17,6 +17,7 @@ MODEL = "ltx2_22B_distilled_gguf_q4_k_m"
 WINDOW_FRAMES = 193
 WINDOW_OVERLAP = 17
 CREATE_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+_engine_launch_lock = threading.RLock()
 
 
 def atomic_json(path: Path, value):
@@ -85,6 +86,90 @@ def build_settings(scene: str, speech: str, sounds: str, images: list[Path], sec
 
 def engine_python(engine: Path):
     return engine / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+
+
+def engine_environment(environ=None, bundle=None):
+    env = dict(os.environ if environ is None else environ)
+    for key in list(env):
+        if key.upper() in ('PYTHONHOME', 'PYTHONPATH', 'PYTHONUSERBASE', '_MEIPASS2') or key.startswith('_PYI_'):
+            env.pop(key, None)
+    if bundle:
+        root = os.path.normcase(os.path.abspath(bundle))
+        def outside_bundle(value):
+            path = os.path.normcase(os.path.abspath(value.strip('"')))
+            return path != root and not path.startswith(root + os.sep)
+        env['PATH'] = os.pathsep.join(value for value in env.get('PATH', '').split(os.pathsep) if value and outside_bundle(value))
+        for key in ('LD_LIBRARY_PATH', 'LIBPATH'):
+            if key + '_ORIG' in env:
+                env[key] = env[key + '_ORIG']
+            else:
+                env.pop(key, None)
+    env.update(HF_HUB_OFFLINE='1', HF_HUB_DISABLE_TELEMETRY='1', GRADIO_ANALYTICS_ENABLED='False', DO_NOT_TRACK='1')
+    return env
+
+
+def engine_command(engine, preview, arguments):
+    worker = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)) / 'preview_worker.py'
+    # -I excludes the packaged script's directory and ignores Python environment
+    # variables. Otherwise a bundled 3.12 .pyd can shadow a 3.11 stdlib module.
+    # -X utf8 also applies when -I ignores PYTHONIOENCODING/PYTHONUTF8.
+    return [str(engine_python(engine)), '-I', '-X', 'utf8', '-u', str(worker), str(engine), str(preview), *arguments]
+
+
+def popen_engine(command, engine):
+    bundle = getattr(sys, '_MEIPASS', None)
+    env = engine_environment(bundle=bundle)
+    with _engine_launch_lock:
+        kernel = None
+        if os.name == 'nt' and getattr(sys, 'frozen', False):
+            import ctypes
+            kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+            kernel.GetDllDirectoryW.argtypes = (ctypes.c_uint32, ctypes.c_wchar_p)
+            kernel.GetDllDirectoryW.restype = ctypes.c_uint32
+            kernel.SetDllDirectoryW.argtypes = (ctypes.c_wchar_p,)
+            kernel.SetDllDirectoryW.restype = ctypes.c_bool
+            length = kernel.GetDllDirectoryW(0, None)
+            buffer = ctypes.create_unicode_buffer(max(1, length + 1))
+            kernel.GetDllDirectoryW(len(buffer), buffer)
+            previous = buffer.value or None
+            if not kernel.SetDllDirectoryW(None):
+                raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            return subprocess.Popen(command, cwd=engine, env=env, stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=CREATE_FLAGS)
+        finally:
+            if kernel is not None:
+                kernel.SetDllDirectoryW(previous)
+
+
+def check_engine_start(engine, report, settings=None):
+    """Exercise the actual bundled-worker launch; never generate a video."""
+    result = {'ok': False, 'frontend_python': sys.version.split()[0], 'frozen': bool(getattr(sys, 'frozen', False))}
+    report.parent.mkdir(parents=True, exist_ok=True)
+    process = None
+    try:
+        process = popen_engine(engine_command(engine, report.with_suffix('.jpg'), ['--studio-startup-check']), engine)
+        output = process.communicate(timeout=90)[0].decode('utf-8', errors='replace')
+        if process.returncode:
+            raise RuntimeError(output[-12000:])
+        result['engine'] = json.loads(output)
+        if settings:
+            command = engine_command(engine, report.with_suffix('.jpg'), ['--offline', '--profile', '4', '--no-mcp-webui',
+                '--attention', 'sdpa', '--process', str(settings.resolve()), '--dry-run', '--output-dir', str(report.parent / 'dry-run-output')])
+            process = popen_engine(command, engine)
+            output = process.communicate(timeout=240)[0].decode('utf-8', errors='replace')
+            report.with_suffix('.log').write_text(output, encoding='utf-8')
+            if process.returncode:
+                raise RuntimeError(output[-12000:])
+            result['dry_run'] = True
+        result['ok'] = True
+    except Exception as exc:
+        if process and process.poll() is None:
+            Runner.stop_process(process)
+            process.communicate()
+        result['error'] = str(exc)
+    atomic_json(report, result)
+    return result
 
 
 def check_engine(engine: Path, manifest: dict):
@@ -239,19 +324,12 @@ class Runner:
 
     def render_shot(self, folder):
         self.cancelled()
-        env = os.environ.copy()
-        env.update(PYTHONUTF8="1", PYTHONIOENCODING="utf-8", HF_HUB_OFFLINE="1",
-                   HF_HUB_DISABLE_TELEMETRY="1", GRADIO_ANALYTICS_ENABLED="False", DO_NOT_TRACK="1")
-        env.pop("PYTHONHOME", None)
-        env.pop("PYTHONPATH", None)
-        worker = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)) / 'preview_worker.py'
-        command = [str(engine_python(self.engine)), '-u', str(worker), str(self.engine), str(folder / 'live-preview.jpg'),
-                   "--offline", "--profile", "4", "--no-mcp-webui", "--attention", "sdpa",
-                   "--process", str(folder / "settings.json"), "--output-dir", str(folder / "render")]
+        command = engine_command(self.engine, folder / 'live-preview.jpg',
+                                ["--offline", "--profile", "4", "--no-mcp-webui", "--attention", "sdpa",
+                                 "--process", str(folder / "settings.json"), "--output-dir", str(folder / "render")])
         with self.lock:
             self.cancelled()
-            process = subprocess.Popen(command, cwd=self.engine, env=env, stdout=subprocess.PIPE,
-                                       stderr=subprocess.STDOUT, creationflags=CREATE_FLAGS)
+            process = popen_engine(command, self.engine)
             self.proc = process
         job = folder.parents[1]
         with (job / "diagnose.log").open("a", encoding="utf-8") as log:

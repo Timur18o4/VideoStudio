@@ -27,6 +27,18 @@ def instrument(source):
 
 def main():
     engine, destination = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
+    if sys.argv[3:] == ['--studio-startup-check']:
+        import json
+        import unicodedata
+        import ssl
+        import sqlite3
+        import ctypes
+        import tqdm
+        import PIL.Image
+        print(json.dumps({'python': sys.version.split()[0], 'executable': sys.executable,
+                          'modules': {module.__name__: module.__file__ for module in
+                                      (unicodedata, ssl, sqlite3, ctypes, tqdm, PIL.Image)}}, ensure_ascii=False), flush=True)
+        return
     sys.argv = [str(engine / 'wgp.py'), *sys.argv[3:]]
     sys.path.insert(0, str(engine))
     os.chdir(engine)

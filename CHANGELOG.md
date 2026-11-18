@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.2.3-preview
+
+- Behebt `ImportError: Module use of python312.dll conflicts with this version of Python` beim Start des Vorschau-Workers aus der Windows-EXE.
+- Die separate KI-Python-Umgebung startet isoliert, mit eigenem Modulpfad und UTF-8-Ausgabe. Dateien aus dem temporären Installer-Verzeichnis werden nicht mehr als KI-Module geladen.
+- Bereinigt geerbte Suchpfade und setzt beim Start die Windows-DLL-Suche vorübergehend zurück; danach wird der Zustand der Oberfläche wiederhergestellt.
+- Neue Regressionstests für kollidierende Module und einen echten Start aus einer Python-3.12-Windows-EXE in eine Python-3.11-KI-Umgebung, ohne Videoberechnung.
+
 ## 0.2.2-preview
 
 - Episodenregie mit dynamischer Szenenanzahl, eigenen Start-/Schlussbildern, Anweisungen, Sprache, Geräuschen und Dauer je Szene; Szenen lassen sich umordnen.

@@ -2,13 +2,15 @@
 
 Ein Windows-Frontend für lokale KI-Videos mit WanGP und LTX-2.3: einzelne Clips oder Episoden mit mehreren Szenen, gespeicherten Charakterreferenzen, eigenen Bildern und optionaler Sprache und Geräuschen. Die Berechnung läuft auf dem eigenen PC.
 
-**Öffentliche Vorschauversion 0.2.2:** [Windows-Installer herunterladen](https://github.com/Timur18o4/VideoStudio/releases/tag/v0.2.2-preview). Unter „Assets“ die Datei `VideoStudio-Setup-0.2.2-preview.exe` auswählen. Für die Installation der Oberfläche ist kein eigenes Python nötig.
+**Öffentliche Vorschauversion 0.2.3:** [Windows-Installer herunterladen](https://github.com/Timur18o4/VideoStudio/releases/tag/v0.2.3-preview). Unter „Assets“ die Datei `VideoStudio-Setup-0.2.3-preview.exe` auswählen. Für die Installation der Oberfläche ist kein eigenes Python nötig.
 
 ## Benutzung
 
 **0.2.2-preview** ergänzt Episoden, Charaktervorlagen, die Szenenvorschau und einstellbare Ausgabeformate. Der Einzelclip-Modus bleibt verfügbar.
 
-1. `VideoStudio-Setup-0.2.2-preview.exe` öffnen und installieren.
+**0.2.3-preview** behebt einen Startfehler der installierten Windows-Version: Der Vorschau-Worker startet die Python-Umgebung der Video-KI isoliert von den mitgelieferten Python-Dateien der Oberfläche. Eine vorhandene Python-3.11-KI benötigt deshalb keine Neuinstallation.
+
+1. `VideoStudio-Setup-0.2.3-preview.exe` öffnen und installieren.
 2. **Video Studio** über die Desktopverknüpfung starten. Auf einem neuen PC einmal **KI einrichten** anklicken und den Download abwarten.
 3. Ein Startbild hochladen. Optional ein zweites Bild als gewünschte Schlussaufnahme ergänzen.
 4. Beschreiben, was im Video passieren soll. Bei Bedarf deutschen Sprechtext und Geräusche ergänzen.
