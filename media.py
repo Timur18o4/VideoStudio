@@ -112,4 +112,3 @@ def prepare_reference(source, target, profile):
     size = tuple(max(32, round(profile[key] / 32) * 32) for key in ('width', 'height'))
     with Image.open(source) as image:
         ImageOps.pad(image.convert('RGB'), size, color='#18151d').save(target, 'JPEG', quality=95)
-
