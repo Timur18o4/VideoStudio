@@ -20,8 +20,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from engine import CREATE_FLAGS, Runner, atomic_json, check_engine
+from version import VERSION
 
-VERSION = "0.1.0-preview"
 RESOURCES = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 MAX_REQUEST = 38 * 1024 * 1024
 
@@ -65,10 +65,15 @@ class Studio:
         self.setup_lock = threading.Lock()
         self.setup = None
         self.server = None
+        self.updating = False
+        self.update_token = ""
+        from updater import Updater
+        self.updater = Updater(self)
 
     def state(self):
         missing = check_engine(self.engine, self.manifest)
         return {"version": VERSION, "ready": not missing, "job": self.runner.snapshot(), "setup": self.setup,
+                "update": {**self.updater.state, "enabled":self.updater.enabled},
                 "download_gb": round(sum(i["size"] for i in self.manifest["models"]) / 1e9, 1)}
 
     def create(self, values):
@@ -80,15 +85,17 @@ class Studio:
             raise ValueError("Bitte überprüfe die Texteingaben.")
         if not scene.strip():
             raise ValueError("Beschreibe zuerst, was im Video passieren soll.")
-        if len(scene) > 4000 or len(speech) > 180 or len(sounds) > 600:
+        if len(scene) > 4000 or len(speech) > 8000 or len(sounds) > 600:
             raise ValueError("Die Beschreibung ist zu lang. Kürze sie bitte etwas.")
         images = values.get("images")
         if not isinstance(images, list) or not 1 <= len(images) <= 2:
             raise ValueError("Lade ein oder zwei Bilder hoch.")
         seconds = values.get("seconds", 8)
-        if type(seconds) is not int or seconds not in (4, 8, 12):
-            raise ValueError("Wähle eine Länge von 4, 8 oder 12 Sekunden.")
+        if type(seconds) is not int or seconds < 1 or seconds > (2**53 - 2) // 24:
+            raise ValueError("Gib eine positive ganze Zahl für die Videolänge in Sekunden ein.")
         with self.setup_lock, self.runner.lock:
+            if self.updating:
+                raise ValueError("Das Programm wird gerade aktualisiert. Warte kurz auf den Neustart.")
             if self.setup and self.setup.get("state") == "running":
                 raise ValueError("Die Einrichtung läuft noch. Bitte warte kurz.")
             job_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(4)
@@ -106,6 +113,8 @@ class Studio:
     def begin_setup(self):
         from setup_engine import install
         with self.setup_lock:
+            if self.updating:
+                raise ValueError("Video Studio wird gerade aktualisiert.")
             if self.setup and self.setup.get("state") == "running":
                 return
             job = self.runner.snapshot()
@@ -167,6 +176,8 @@ class Handler(BaseHTTPRequestHandler):
         if not self.same_origin():
             return self.respond({"error": "Zugriff verweigert."}, 403)
         path = urlsplit(self.path).path
+        if path == "/api/health":
+            return self.respond({"version": VERSION, "update_token": self.studio.update_token})
         if path == "/api/session":
             return self.respond({"token": self.studio.token})
         if path == "/api/state":
@@ -251,6 +262,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(self.studio.create(values), 202)
             if path == "/api/cancel":
                 self.studio.runner.cancel()
+            elif path == "/api/check-updates":
+                self.studio.updater.check_async()
             elif path == "/api/setup":
                 self.studio.begin_setup()
             elif path == "/api/open-folder":
@@ -292,7 +305,14 @@ def main():
     parser.add_argument("--engine", type=Path)
     parser.add_argument("--port", type=int, default=7880)
     parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--apply-update", type=Path)
+    parser.add_argument("--skip-update-once", action="store_true")
+    parser.add_argument("--update-token", default="")
     args = parser.parse_args()
+    if args.apply_update:
+        from updater import apply_plan
+        apply_plan(args.apply_update)
+        return
     args.data.mkdir(parents=True, exist_ok=True)
     lock_file = args.data / "application.lock"
     with lock_file.open("a+b") as lock:
@@ -309,11 +329,15 @@ def main():
                         webbrowser.open(address)
                 return
         studio = Studio(args.data, args.engine)
-        for port in range(args.port, args.port + 20):
+        studio.update_token = args.update_token
+        ports = [args.port] * 40 if args.update_token else range(args.port, args.port + 20)
+        for port in ports:
             try:
                 server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
                 break
             except OSError:
+                if args.update_token:
+                    time.sleep(0.25)
                 continue
         else:
             raise RuntimeError("Kein freier lokaler Anschluss gefunden.")
@@ -322,11 +346,17 @@ def main():
         studio.server = server
         url = f"http://127.0.0.1:{server.server_port}/"
         atomic_json(studio.data / "adresse.json", {"url": url})
+        if args.update_token:
+            if not re.fullmatch(r"[0-9a-f]{24}", args.update_token):
+                raise ValueError("Ungültige Neustartprüfung.")
+            atomic_json(studio.data / "updates" / f"health-{args.update_token}.json", {"version": VERSION, "token": args.update_token, "port":server.server_port})
         if not args.no_browser:
             webbrowser.open(url)
         try:
+            studio.updater.start(skip_initial=args.skip_update_once)
             server.serve_forever(poll_interval=0.3)
         finally:
+            studio.updater.shutdown.set()
             server.server_close()
 
 

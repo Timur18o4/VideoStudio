@@ -11,3 +11,6 @@ engine/
 *.log
 adresse.json
 application.lock
+*.dpapi
+updates/
+*.private

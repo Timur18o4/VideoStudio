@@ -1,5 +1,15 @@
 # Änderungen
 
+## 0.2.0-preview
+
+- Frei eingebbare Videolänge in ganzen Sekunden ab 1 statt fester Auswahl.
+- Automatische Fortsetzung längerer Videos in überlappenden Abschnitten mit begrenzter Fenstergröße.
+- Mehr Platz für längere Sprechtexte.
+- Automatische Updateprüfung beim Start und alle sechs Stunden sowie manuelle Prüfung unter Hilfe.
+- Signierte Update-Manifeste (Ed25519), SHA-256-Prüfung, feste Downloadadressen und erlaubte Programmdateien.
+- Installation erst ohne laufenden Auftrag, automatischer Neustart mit Startprüfung und Wiederherstellung bei Fehlern.
+- Erhalt der lokalen Einstellungen, Bilder, Videos und KI-Dateien bei Updates.
+
 ## 0.1.0-preview
 
 - Einfaches lokales Frontend mit einem Startbild und optionalem Schlussbild.

@@ -10,5 +10,6 @@ Dieses unabhängige Frontend verwendet eine separat installierte, unveränderte 
 - CPython: https://www.python.org/psf/license/ — PSF License. Python ist im Frontend-Programm gebündelt; beim Build wird der Originaltext mit aufgenommen.
 - Pillow: https://python-pillow.github.io/pillow-perf/ und https://github.com/python-pillow/Pillow — MIT-CMU und Hinweise zu mitgelieferten Bibliotheken; Originalhinweise werden beim Build in `licenses/Pillow` aufgenommen.
 - PyInstaller: https://pyinstaller.org — GPL-2.0 mit Bootloader-Ausnahme; Originaltexte werden beim Build mit aufgenommen.
+- Cryptography: https://cryptography.io — Apache-2.0 oder BSD-3-Clause; CFFI und pycparser mit ihren eigenen Bedingungen. Die Originaltexte dieser gebündelten Komponenten werden beim Build in `licenses` aufgenommen. Cryptography prüft die Ed25519-Signaturen der Updates.
 
 Die Versionen der separat installierten Engine-Bibliotheken sind in `requirements-engine.lock` festgehalten. Diese Bibliotheken werden nicht im kleinen Frontend-Installer weitergegeben. Ihre jeweiligen Bedingungen gelten unverändert.

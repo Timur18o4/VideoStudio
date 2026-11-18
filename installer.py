@@ -12,6 +12,7 @@ import tempfile
 import time
 import zipfile
 from pathlib import Path
+from version import VERSION
 
 APP_ID = "VideoStudioEinfach"
 APP_NAME = "Video Studio"
@@ -50,7 +51,7 @@ def shortcuts(target, remove=False):
 def register(target):
     import winreg
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Microsoft\Windows\CurrentVersion\Uninstall\{APP_ID}") as key:
-        values = {"DisplayName": APP_NAME, "DisplayVersion": "0.1.0 Preview", "InstallLocation": str(target),
+        values = {"DisplayName": APP_NAME, "DisplayVersion": VERSION, "InstallLocation": str(target),
                   "DisplayIcon": str(target / "VideoStudio.exe"), "UninstallString": f'"{target / "Deinstallieren.exe"}" --uninstall',
                   "Publisher": "Video Studio · unabhängiges Frontend"}
         for name, value in values.items():

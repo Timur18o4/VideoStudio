@@ -103,6 +103,22 @@ class HTTP(unittest.TestCase):
         self.assertEqual(exc.exception.code, 400)
         self.assertFalse(list((self.data / "jobs").iterdir()))
 
+    def test_free_duration_is_forwarded_with_bounded_generation_windows(self):
+        with patch.object(self.studio.runner, "start", side_effect=lambda job,settings,audible:{"settings":settings}):
+            for seconds in (1,7,13,65,600):
+                with self.request('/api/generate', {"scene":"Sie winkt.","images":[picture()],"seconds":seconds}, {"X-Studio-Token":self.studio.token}) as result:
+                    settings=json.load(result)['settings']
+                self.assertEqual(settings['video_length'],seconds*24+1)
+                self.assertEqual(settings['sliding_window_size'],193)
+                self.assertEqual(settings['sliding_window_overlap'],17)
+
+    def test_invalid_duration_is_rejected_before_a_job_is_created(self):
+        for seconds in (0,-1,True,1.5,'20',None,10**30):
+            with self.assertRaises(urllib.error.HTTPError) as exc:
+                self.request('/api/generate', {"scene":"Sie winkt.","images":[picture()],"seconds":seconds}, {"X-Studio-Token":self.studio.token})
+            self.assertEqual(exc.exception.code,400)
+        self.assertFalse(list((self.data / "jobs").iterdir()))
+
     def test_media_range_and_download_headers(self):
         folder = self.data / "jobs/20261117-123456-1234abcd"
         folder.mkdir()

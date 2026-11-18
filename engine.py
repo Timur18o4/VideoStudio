@@ -11,6 +11,8 @@ import time
 from pathlib import Path
 
 MODEL = "ltx2_22B_distilled_gguf_q4_k_m"
+WINDOW_FRAMES = 193
+WINDOW_OVERLAP = 17
 CREATE_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
@@ -49,6 +51,8 @@ def build_settings(scene: str, speech: str, sounds: str, images: list[Path], sec
         "image_start": str(images[0].resolve()), "audio_prompt_type": "",
         "audio_guide": None,
         "repeat_generation": 1, "batch_size": 1,
+        "sliding_window_size": WINDOW_FRAMES,
+        "sliding_window_overlap": WINDOW_OVERLAP,
     }
     if len(images) == 2:
         result["image_end"] = str(images[1].resolve())
@@ -198,11 +202,11 @@ class Runner:
                 return
             fraction = int(match[2]) / total
             value = round(15 + fraction * 60) if total == 8 else round(75 + fraction * 20)
-            self.update(message="Dein Video wird berechnet …" if total == 8 else "Bewegung und Details werden verfeinert …", progress=value)
+            self.update(message="Dein Video wird berechnet …" if total == 8 else "Bewegung und Details werden verfeinert …", progress=None if self.current["seconds"] > 8 else value)
         elif "Encoding Text Prompt" in line:
             self.update(message="Die KI liest deine Szenenbeschreibung …", progress=None)
         elif "VAE Decoding" in line or "Encoding Video" in line:
-            self.update(message="Bild und Ton werden gespeichert …", progress=97)
+            self.update(message="Bild und Ton werden gespeichert …", progress=None if self.current["seconds"] > 8 else 97)
 
     @staticmethod
     def friendly_error(log):

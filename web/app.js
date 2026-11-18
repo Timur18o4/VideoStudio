@@ -3,9 +3,13 @@ const $ = id => document.getElementById(id);
 let token = "", state = null, images = [null, null], imageURLs = [null, null], currentVideo = "", sending = false;
 let db = null;
 
-async function api(path, values) {
+async function api(path, values, retried = false) {
   const response = await fetch(path, {method: values === undefined ? "GET" : "POST", headers: {"X-Studio-Token": token, ...(values === undefined ? {} : {"Content-Type": "application/json"})}, ...(values === undefined ? {} : {body: JSON.stringify(values)})});
   const data = await response.json();
+  if (response.status === 403 && !retried) {
+    const session = await fetch('/api/session');
+    if (session.ok) { token = (await session.json()).token; return api(path, values, true); }
+  }
   if (!response.ok) throw new Error(data.error || "Die Anfrage ist fehlgeschlagen.");
   return data;
 }
@@ -70,8 +74,13 @@ function showVideo(url, seconds) {
 async function refresh() {
   try {
     const previous = state?.job?.state;
-    state = await api("/api/state");
+    const next = await api("/api/state");
+    if (state && state.version !== next.version) { saveDraft(); location.reload(); return; }
+    state = next;
     $("version").textContent = state.version;
+    $("update-status").textContent = state.update?.message || 'Automatische Updates aktiv.';
+    $("update-footer").textContent = state.update?.message || 'Automatische Updates';
+    $("check-updates").disabled = !state.update?.enabled || ['checking','downloading','ready','installing'].includes(state.update?.state);
     const settingUp = state.setup?.state === "running";
     $("setup-panel").hidden = state.ready && !state.setup;
     $("setup-description").textContent = `Einmalig ca. ${state.download_gb} GB KI-Dateien plus Programmbestandteile herunterladen. Danach offline erstellen.`;
@@ -98,7 +107,10 @@ async function refresh() {
       else { $("result-meta").textContent = currentVideo ? "Gespeichertes Video" : "Vorschau"; }
     }
     updateButton();
-  } catch (exc) { error("Verbindung zum lokalen Studio unterbrochen. Starte das Programm bei Bedarf erneut."); }
+  } catch (exc) {
+    if (state?.update?.state === 'installing' || state?.update?.state === 'ready') $('update-footer').textContent = 'Aktualisierung läuft. Verbindung wird wiederhergestellt …';
+    else error("Verbindung zum lokalen Studio unterbrochen. Starte das Programm bei Bedarf erneut.");
+  }
 }
 async function loadHistory() {
   try {
@@ -135,6 +147,7 @@ $("create-form").addEventListener("submit", async event => {
 $("cancel").addEventListener("click", async () => {try {await api("/api/cancel", {}); await refresh();} catch (exc) {error(exc.message);}});
 async function setup() {$("help").close(); error(""); try {await api("/api/setup", {}); await refresh();} catch (exc) {error(exc.message);}}
 $("setup-start").addEventListener("click", setup); $("repair").addEventListener("click", setup);
+$("check-updates").addEventListener("click", async () => { try {await api('/api/check-updates', {}); await refresh();} catch(exc) {error(exc.message);} });
 $("help-open").addEventListener("click", () => $("help").showModal()); $("help-close").addEventListener("click", () => $("help").close());
 for (const [id,path] of [["open-folder","/api/open-folder"],["open-log","/api/open-log"]]) $(id).addEventListener("click", async () => {try {await api(path, {});} catch (exc) {$("help").close(); error(exc.message);}});
 $("quit").addEventListener("click", async () => {try {await api("/api/quit", {}); document.body.replaceChildren(); const p=document.createElement("p"); p.textContent="Video Studio wurde beendet. Du kannst dieses Fenster schließen."; p.style.padding="40px"; document.body.append(p);} catch(exc) {error(exc.message);}});
