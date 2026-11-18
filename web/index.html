@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Video Studio · Lokal</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<div class="app">
+  <header><a class="brand" href="/" aria-label="Video Studio Startseite"><span class="brand-icon" aria-hidden="true">▷</span>Video Studio</a><div class="header-right"><span class="local"><i></i> Auf deinem PC</span><button class="quiet" id="help-open" type="button">Hilfe</button></div></header>
+  <main>
+    <div class="intro"><p class="eyebrow">DEIN LOKALES VIDEOSTUDIO</p><h1>Ein Bild. Deine Geschichte.</h1><p>Bilder hochladen, Szene beschreiben, Video erstellen.</p></div>
+    <section id="setup-panel" class="setup-panel" hidden aria-labelledby="setup-heading">
+      <div><h2 id="setup-heading">Einmal einrichten. Danach lokal erstellen.</h2><p id="setup-description">Die KI-Dateien werden einmal heruntergeladen. Deine Bilder bleiben auf deinem PC.</p><p id="setup-message" role="status"></p><progress id="setup-progress" hidden></progress></div>
+      <button class="primary" id="setup-start" type="button">KI einrichten</button>
+    </section>
+    <div class="workspace">
+      <form id="create-form" class="panel editor">
+        <section aria-labelledby="pictures-title"><div class="section-heading"><h2 id="pictures-title"><span class="step">1</span> Dein Model</h2><span class="muted small">JPG, PNG oder WebP</span></div>
+          <div class="uploads">
+            <div class="upload" id="upload-start"><input id="image-start" type="file" accept="image/jpeg,image/png,image/webp"><label for="image-start"><img id="preview-start" alt="Dein Startbild" hidden><span class="upload-empty" id="empty-start"><span class="upload-symbol" aria-hidden="true">＋</span><strong>Bild hochladen</strong><small>Der Anfang deines Videos</small></span><span class="image-label" id="caption-start" hidden>Startbild ändern</span></label><button class="remove" id="remove-start" type="button" aria-label="Startbild entfernen" hidden>×</button></div>
+            <div class="upload" id="upload-end"><input id="image-end" type="file" accept="image/jpeg,image/png,image/webp"><label for="image-end"><img id="preview-end" alt="Dein optionales Schlussbild" hidden><span class="upload-empty" id="empty-end"><span class="upload-symbol" aria-hidden="true">＋</span><strong>Zweites Bild</strong><small>Optional · gewünschtes Ende</small></span><span class="image-label" id="caption-end" hidden>Schlussbild ändern</span></label><button class="remove" id="remove-end" type="button" aria-label="Schlussbild entfernen" hidden>×</button></div>
+          </div>
+          <p class="hint">Ein Bild reicht. Das zweite zeigt, wie die Szene enden soll.</p>
+        </section>
+        <section aria-labelledby="scene-label"><h2><span class="step">2</span> <label id="scene-label" for="scene">Was soll passieren?</label></h2><textarea id="scene" name="scene" rows="4" maxlength="4000" required placeholder="Zum Beispiel: Sie joggt am Strand auf die Kamera zu, bleibt nah vor der Linse stehen und lächelt verschmitzt."></textarea></section>
+        <section class="audio-section" aria-labelledby="audio-title"><div class="section-heading"><h2 id="audio-title"><span class="step">3</span> Sprache &amp; Geräusche</h2><span class="optional">Optional</span></div><label class="field-label" for="speech">Was soll dein Model sagen?</label><textarea id="speech" name="speech" rows="2" maxlength="180" placeholder="Zum Beispiel: Schön, dass du da bist."></textarea><label class="field-label" for="sounds">Was soll man hören?</label><input id="sounds" name="sounds" maxlength="600" placeholder="Zum Beispiel: Meeresrauschen und Schritte im Sand"><p class="hint">Beides leer lassen für ein Video ohne Ton.</p></section>
+        <div class="create-footer"><label class="length" for="seconds">Videolänge <select id="seconds" name="seconds"><option value="4">4 Sekunden</option><option value="8" selected>8 Sekunden</option><option value="12">12 Sekunden</option></select></label><button id="generate" class="primary generate" type="submit"><span aria-hidden="true">▷</span> Video erstellen</button></div>
+        <p class="error" id="form-error" role="alert" hidden></p>
+      </form>
+      <aside class="result-column">
+        <section class="panel result" aria-labelledby="result-title"><div class="section-heading"><h2 id="result-title">Dein Video</h2><span class="muted small" id="result-meta">Vorschau</span></div>
+          <div class="video-stage"><div id="video-placeholder" class="video-placeholder"><div class="placeholder-frame" aria-hidden="true"><span>▷</span></div><h3>Deine Idee wird bewegt.</h3><p>Hier erscheint dein fertiges Video.<br>Die Erstellung kann mehrere Minuten dauern.</p></div><video id="video" controls playsinline preload="metadata" hidden aria-label="Vorschau deines KI-Videos"></video></div>
+          <div class="job-status" id="job-status" hidden><div class="status-heading"><span id="status-icon" aria-hidden="true"></span><p id="job-message" role="status" aria-live="polite"></p></div><progress id="job-progress" max="100"></progress><div class="status-bottom"><span id="elapsed" class="muted small"></span><button class="quiet" id="cancel" type="button" hidden>Abbrechen</button></div></div>
+          <a id="download" class="primary download" hidden download="Mein-KI-Video.mp4">Video speichern <span aria-hidden="true">↓</span></a>
+        </section>
+        <p class="privacy"><span aria-hidden="true">◈</span> Deine Bilder, Texte und Videos bleiben auf deinem PC.</p>
+        <details id="history-panel" class="history"><summary>Bisherige Videos <span id="history-count"></span></summary><div id="history-list"></div><button id="open-folder" class="quiet" type="button">Videoordner öffnen ↗</button></details>
+      </aside>
+    </div>
+  </main>
+  <footer><span>Video Studio <span id="version"></span> · Vorschauversion</span><button id="quit" class="quiet" type="button">Programm beenden</button></footer>
+</div>
+<dialog id="help"><div class="dialog-heading"><h2>Einfach loslegen</h2><button id="help-close" class="quiet" type="button" aria-label="Hilfe schließen">✕</button></div><ol><li>Ein Startbild hochladen. Ein zweites Bild ist optional und bestimmt die Schlussaufnahme.</li><li>Beschreiben, was die Person tun soll. Kurze, konkrete Szenen funktionieren besser.</li><li>Bei Bedarf gesprochenen Text und Geräusche ergänzen. Dann <strong>Video erstellen</strong>.</li></ol><p>Sprache wird auf Deutsch erzeugt. Wortlaut, Lippenbewegungen und Identität können abweichen. Für lange Sätze ist mehr Videolänge nötig.</p><p>Diese Vorschauversion ist für Windows 10/11 mit NVIDIA-Grafikkarte ab 8 GB Grafikspeicher und mindestens 32 GB Arbeitsspeicher vorgesehen. Geprüft wurde die Videoberechnung auf einer RTX 3060 Ti mit 64 GB Arbeitsspeicher.</p><p id="setup-help">Die einmalige Einrichtung braucht Internet und viel freien Speicher. Danach funktioniert die Erstellung offline.</p><div class="help-actions"><button id="repair" class="secondary" type="button">KI-Dateien prüfen und ergänzen</button><button id="open-log" class="quiet" type="button">Fehlerprotokoll öffnen</button></div><p class="small muted">Berechnung mit WanGP und LTX-2.3. Eigenständiges Frontend, kein offizielles WanGP-Produkt. Lizenzen liegen im Programmordner.</p></dialog>
+</body></html>

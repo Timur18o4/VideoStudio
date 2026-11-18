@@ -1,0 +1,165 @@
+{
+  "format": 1,
+  "engine_commit": "38758d3c73366422efcf609abb63cab8385f3552",
+  "models": [
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/added_tokens.json",
+      "size": 35,
+      "sha256": "50b2f405ba56a26d4913fd772089992252d7f942123cc0a034d96424221ba946",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/added_tokens.json"
+    },
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/chat_template.json",
+      "size": 1615,
+      "sha256": "fe16baf728db49457cde32802cd7efc0ac8a7a9877dbe22fe3322b2d9dc6ccd9",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/chat_template.json"
+    },
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/config.json",
+      "size": 1611,
+      "sha256": "72ba569f583e58bfd39e192d859bc0c0905c3d08b2d0d4e520b7f8543fc87cdc",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/config.json"
+    },
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/config_light.json",
+      "size": 907,
+      "sha256": "c425c32bd6ea9ef8542ca0567fb903be7b728dc3b454d2511adecfc85978bb5c",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/config_light.json"
+    },
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/gemma-3-12b-it-qat-q4_0-unquantized_quanto_bf16_int8.safetensors",
+      "size": 13210647730,
+      "sha256": "1fad55b5df6c660c7982985c8ced76369114b1d31bbec93fbecc66a8bf30f36a",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/gemma-3-12b-it-qat-q4_0-unquantized_quanto_bf16_int8.safetensors"
+    },
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/generation_config.json",
+      "size": 173,
+      "sha256": "13da6aad6852a008419f46df754b3452fc96387a4213c25811509d474e5a4776",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/generation_config.json"
+    },
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/preprocessor_config.json",
+      "size": 570,
+      "sha256": "f688d6bb20c5017601c4011de7ca656da8485b540b05013efdaf986c0fcc918d",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/preprocessor_config.json"
+    },
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/processor_config.json",
+      "size": 70,
+      "sha256": "3ffd5f11778dc73e2b69b3c00535e4121e1badf7018136263cd17b5b34fbaa53",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/processor_config.json"
+    },
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/special_tokens_map.json",
+      "size": 662,
+      "sha256": "2f7b0adf4fb469770bb1490e3e35df87b1dc578246c5e7e6fc76ecf33213a397",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/special_tokens_map.json"
+    },
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/tokenizer.json",
+      "size": 33384570,
+      "sha256": "7d4046bf0505a327dd5a0abbb427ecd4fc82f99c2ceaa170bc61ecde12809b0c",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/tokenizer.json"
+    },
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/tokenizer.model",
+      "size": 4689074,
+      "sha256": "1299c11d7cf632ef3b4e11937501358ada021bbdf7c47638d13c0ee982f2e79c",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/tokenizer.model"
+    },
+    {
+      "path": "gemma-3-12b-it-qat-q4_0-unquantized/tokenizer_config.json",
+      "size": 1157001,
+      "sha256": "31e860fdfa360fa5aa58fe93252799facde5a52d1352f77d45978ab2a7e9eeb1",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/gemma-3-12b-it-qat-q4_0-unquantized/tokenizer_config.json"
+    },
+    {
+      "path": "ltx-2.3-22b-distilled-Q4_K_M_light.gguf",
+      "size": 12971904032,
+      "sha256": "e324dbdacfc228e02e79e2f952c8274b16ba155d029db5f9abdd55a311325208",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/ltx-2.3-22b-distilled-Q4_K_M_light.gguf"
+    },
+    {
+      "path": "ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors",
+      "size": 12583096,
+      "sha256": "78bffa6049bae2649a4365ec8769db88052c21348d643e8fc1ce6d483d994c5b",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors"
+    },
+    {
+      "path": "ltx-2.3-22b_audio_vae.safetensors",
+      "size": 106538084,
+      "sha256": "c99a673c32ad0f7f6349df58466c0a1c2f398e314484a33988794322375cbde4",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/ltx-2.3-22b_audio_vae.safetensors"
+    },
+    {
+      "path": "ltx-2.3-22b_embeddings_connector.safetensors",
+      "size": 4032404584,
+      "sha256": "eb37b1ec8024a311e863bcf5a684bdb6c64707216c3754c6f4078eae908d0600",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/ltx-2.3-22b_embeddings_connector.safetensors"
+    },
+    {
+      "path": "ltx-2.3-22b_text_embedding_projection.safetensors",
+      "size": 2312151888,
+      "sha256": "985bba2295af346ac74b627afc8d27f4b5f277fb20c87968d569b4bb5d7fd28f",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/ltx-2.3-22b_text_embedding_projection.safetensors"
+    },
+    {
+      "path": "ltx-2.3-22b_vae.safetensors",
+      "size": 1452263226,
+      "sha256": "646b77e252d08ec3a6e24fccb4bf53c80c7cf52025272f155f30fe2b84f0e1d4",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/ltx-2.3-22b_vae.safetensors"
+    },
+    {
+      "path": "ltx-2.3-22b_vocoder.safetensors",
+      "size": 258347744,
+      "sha256": "3624e13fcf9fa8b2a1437bd9eb628c3a436282125e9e28ca1071142a4946e3f5",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/ltx-2.3-22b_vocoder.safetensors"
+    },
+    {
+      "path": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+      "size": 995743560,
+      "sha256": "5f416311fa8172b65af67530758964708d29a317b830d689a51143b7f91913ed",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+    },
+    {
+      "path": "ltx-2.3-temporal-upscaler-x2-1.0.safetensors",
+      "size": 261944000,
+      "sha256": "2bc3300f2b3c3c1834d72164fbf13a3b9fd73e5a741e8a2c3f4035f89a75c3fe",
+      "url": "https://huggingface.co/DeepBeepMeep/LTX-2/resolve/1798f80b3340d2f87cffae42f9fa5367d0963d0c/ltx-2.3-temporal-upscaler-x2-1.0.safetensors"
+    },
+    {
+      "path": "roformer/download_checks.json",
+      "size": 28267,
+      "sha256": "d3622e1fa19c161d3cf704927711b453d593a3f1eb0f2e0838c3136907935151",
+      "url": "https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/378286d397e160409d4d453e0c9336d54780ac74/roformer/download_checks.json"
+    },
+    {
+      "path": "roformer/model_bs_roformer_ep_317_sdr_12.9755.ckpt",
+      "size": 639331213,
+      "sha256": "5b84f37e8d444c8cb30c79d77f613a41c05868ff9c9ac6c7049c00aefae115aa",
+      "url": "https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/378286d397e160409d4d453e0c9336d54780ac74/roformer/model_bs_roformer_ep_317_sdr_12.9755.ckpt"
+    },
+    {
+      "path": "roformer/model_bs_roformer_ep_317_sdr_12.9755.yaml",
+      "size": 2273,
+      "sha256": "2bfdd16c656bd9519aba757cc4f8834b7ede675eb1e00ec4772d74ae1c41af7f",
+      "url": "https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/378286d397e160409d4d453e0c9336d54780ac74/roformer/model_bs_roformer_ep_317_sdr_12.9755.yaml"
+    }
+  ],
+  "engine": {
+    "url": "https://codeload.github.com/deepbeepmeep/Wan2GP/zip/38758d3c73366422efcf609abb63cab8385f3552",
+    "size": 45677450,
+    "sha256": "4a65052e218297de2ca5e8291737739c153298f9babf43212e6925d50515bb0f"
+  },
+  "uv": {
+    "url": "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-pc-windows-msvc.zip",
+    "size": 15236317,
+    "sha256": "0cdc5b38fe5a8168ed6a25814f5ba43c21d313dd3187314fccb37b7cec46e021"
+  },
+  "ffmpeg": {
+    "url": "https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip",
+    "size": 114768076,
+    "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba"
+  }
+}
