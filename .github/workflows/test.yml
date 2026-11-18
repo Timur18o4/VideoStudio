@@ -40,7 +40,9 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -r requirements-build.txt
       - name: Tatsächliche Windows-EXE mit Vorschau-Worker bauen
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RuntimeCheck --distpath frozen-dist --workpath frozen-build --specpath frozen-build --hidden-import unicodedata --add-data "preview_worker.py;." app.py
+        run: |
+          $workerPath = (Resolve-Path preview_worker.py).Path
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name RuntimeCheck --distpath frozen-dist --workpath frozen-build --specpath frozen-build --hidden-import unicodedata --add-data "$workerPath;." app.py
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
