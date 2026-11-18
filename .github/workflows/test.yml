@@ -21,4 +21,10 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-frontend.txt
       - run: python -m pip install -r requirements-frontend.txt
+      - name: FFmpeg für Schnitt- und Episodentests installieren (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg --yes --no-progress
+      - name: FFmpeg für Schnitt- und Episodentests installieren (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: python -m unittest discover -s tests -v

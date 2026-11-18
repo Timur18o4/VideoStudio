@@ -1,12 +1,14 @@
 # Video Studio
 
-Ein kleines Windows-Frontend für lokale KI-Videos mit WanGP und LTX-2.3: ein oder zwei Bilder hochladen, eine Szene beschreiben und bei Bedarf Sprache und Geräusche ergänzen. Die Berechnung läuft auf dem eigenen PC.
+Ein Windows-Frontend für lokale KI-Videos mit WanGP und LTX-2.3: einzelne Clips oder Episoden mit mehreren Szenen, gespeicherten Charakterreferenzen, eigenen Bildern und optionaler Sprache und Geräuschen. Die Berechnung läuft auf dem eigenen PC.
 
-**Öffentliche Vorschauversion:** [Windows-Installer herunterladen](https://github.com/Timur18o4/VideoStudio/releases/tag/v0.2.1-preview). Unter „Assets“ die Datei `VideoStudio-Setup-0.2.1-preview.exe` auswählen. Für die Installation der Oberfläche ist kein eigenes Python nötig.
+**Öffentliche Vorschauversion 0.2.2:** [Windows-Installer herunterladen](https://github.com/Timur18o4/VideoStudio/releases/tag/v0.2.2-preview). Unter „Assets“ die Datei `VideoStudio-Setup-0.2.2-preview.exe` auswählen. Für die Installation der Oberfläche ist kein eigenes Python nötig.
 
 ## Benutzung
 
-1. `VideoStudio-Setup-0.2.1-preview.exe` öffnen und installieren.
+**0.2.2-preview** ergänzt Episoden, Charaktervorlagen, die Szenenvorschau und einstellbare Ausgabeformate. Der Einzelclip-Modus bleibt verfügbar.
+
+1. `VideoStudio-Setup-0.2.2-preview.exe` öffnen und installieren.
 2. **Video Studio** über die Desktopverknüpfung starten. Auf einem neuen PC einmal **KI einrichten** anklicken und den Download abwarten.
 3. Ein Startbild hochladen. Optional ein zweites Bild als gewünschte Schlussaufnahme ergänzen.
 4. Beschreiben, was im Video passieren soll. Bei Bedarf deutschen Sprechtext und Geräusche ergänzen.
@@ -15,6 +17,26 @@ Ein kleines Windows-Frontend für lokale KI-Videos mit WanGP und LTX-2.3: ein od
 Ohne Sprechtext und Geräusche wird das exportierte Video stummgeschaltet. Bilder und Texte bleiben im jeweiligen lokalen Auftrag. Browser-Eingaben werden auf diesem PC gespeichert, damit sie nach dem Neuladen wieder verfügbar sind. Zum vollständigen Beenden gibt es unten **Programm beenden**. Das Schließen des Browserfensters beendet einen laufenden Auftrag nicht.
 
 Das zweite Bild dient als Schlussbild, nicht als beliebige zusätzliche Identitätsreferenz. Die Videolänge lässt sich frei in ganzen Sekunden ab 1 eingeben, beispielsweise 7, 25 oder 90. Die Oberfläche setzt keine feste Höchstdauer. Längere Videos werden automatisch in überlappenden Abschnitten berechnet; Rechenzeit, Speicherbedarf, Übergänge und Identitätsstabilität begrenzen die praktisch sinnvolle Länge. Ein beliebig langer, durchgehend konsistenter Film ist nicht garantiert. Das Programm trainiert kein neues Personenmodell. Die Länge des Sprechtextes muss zur Videolänge passen.
+
+## Episoden und wiederkehrende Charaktere (0.2.2)
+
+1. **Episode & Charaktere** öffnen. Standardmäßig sind fünf Szenen vorbereitet. Unter **Charaktere & vorhandene Clips** einen Namen und ein Referenzbild speichern; Merkmale sind optional und werden dem Prompt angehängt.
+2. Pro Szene den Charakter auswählen oder ein eigenes Startbild hochladen. Ein zweites Bild ist die gewünschte Schlussaufnahme. Kamera, Handlung, Dauer und bei Bedarf Sprache/Geräusche je Aufnahme eintragen.
+3. Szenen hinzufügen, entfernen oder mit den Pfeilen umordnen. **Auf Szenen verteilen** verteilt die Gesamtlänge auf ganze Videobilder; fünf Szenen bei 30 Sekunden ergeben je sechs Sekunden.
+4. **Episode speichern** bewahrt alle Referenzen und Anweisungen lokal. Eine gespeicherte Episode lässt sich laden und mit **Als neue Folge** kopieren, ohne die ursprüngliche Vorlage zu überschreiben.
+5. **Episode erstellen** berechnet die Aufnahmen nacheinander und fügt sie in Listenreihenfolge zusammen. Fertige Szenen rechts sofort ansehen, speichern oder ihr letztes Standbild als Anfang einer neuen Szene übernehmen.
+
+Unter **Charaktere & vorhandene Clips** lassen sich auch eigene Clips importieren (bis 1 GB). Ein Standbild an einem gewählten Zeitpunkt kann als Charakterreferenz oder Szenenbild dienen. Alternativ in einer Szene **Fertigen Clip verwenden** wählen, Beginn und Länge des Ausschnitts angeben. Ein importierter Clip wird nicht automatisch analysiert oder als Training verwendet. Die Wiedergabe importierter Originaldateien hängt vom Browser und ihrem Codec ab; die exportierten MP4-Videos verwenden H.264.
+
+Referenzbilder sind eine visuelle Vorgabe, kein trainiertes Personenmodell. Gesicht, Kleidung und Körper können zwischen Aufnahmen abweichen. Für mehrere Personen in derselben Aufnahme ein gemeinsames Szenenbild verwenden. Das zweite Bild ist weiterhin ein Schlussbild, keine zweite Identitätsreferenz.
+
+**Live-Zwischenbilder** zeigen die grobe RGB-Vorschau der laufenden KI-Schritte. Sie sind keine bereits fertig gerenderten Filmframes; Farben und Details können stark abweichen. Beim Laden der KI und in Rechenschritten ohne Vorschau bleibt die Anzeige leer. Falls die lokale Engine keine Vorschau liefert, wird dies angezeigt; fertige Szenen bleiben sofort abspielbar. **Abbrechen** stoppt den aktuellen Render- oder Exportprozess und startet keine weiteren Szenen. Vollständig gespeicherte Szenen bleiben erhalten, auch nach Abbruch oder Fehler.
+
+## Bildformat, Auflösung, FPS und Datei
+
+Die vier Auswahlfelder über dem Editor gelten für Einzelclips und die gesamte Episode. **Wie das Startbild** übernimmt das Seitenverhältnis der ersten Aufnahme. 480p/720p/1080p bezeichnen die kurze Bildkante, z. B. 1280 × 720 bei 16:9 und 720 × 1280 bei 9:16. Pixelmaße werden auf gerade Zahlen gerundet. Bilder werden eingepasst, bei Bedarf mit Rändern, damit Körperteile nicht durch automatisches Zuschneiden verschwinden.
+
+Die ausgewählte FPS-Zahl geht an die KI und bestimmt die angeforderte Bildzahl. Das Modell erhält seine nötige Bildzahl im 8n+1-Raster; überzählige Bilder werden beim Export entfernt. Das Ergebnis hat die gewählte Auflösung, Bildrate und auf einzelne Bilder gerundete Dauer. Höhere Auflösung/FPS können deutlich länger dauern oder den Grafikspeicher überfordern. MP4 ist schneller zu exportieren; WebM benötigt eine zusätzliche Umwandlung. Zwischenclips bleiben als MP4 erhalten. Bei gemischten Szenen werden fehlende Tonspuren durch Stille ergänzt, Szenen ohne gewünschte Sprache/Geräusche bleiben stumm.
 
 ## Direkte Beschreibung und Textvorschau
 

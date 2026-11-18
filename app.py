@@ -17,7 +17,7 @@ import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, unquote
 
 from engine import CREATE_FLAGS, Runner, atomic_json, check_engine
 from version import VERSION
@@ -61,6 +61,8 @@ class Studio:
         self.engine = Path(self.config.get("engine", self.data / "engine"))
         self.manifest = json.loads((RESOURCES / "models.lock.json").read_text(encoding="utf-8"))
         self.runner = Runner(self.engine, self.data, self.manifest)
+        from episodes import Library
+        self.library = Library(self)
         self.token = secrets.token_urlsafe(32)
         self.setup_lock = threading.Lock()
         self.setup = None
@@ -101,14 +103,19 @@ class Studio:
 
     def create(self, values):
         from engine import build_settings
+        from media import export_options, resolve_profile, prepare_reference
+        from PIL import Image
         scene, speech, sounds, direct_prompt = self.prompt_inputs(values)
+        options = export_options(values.get('output'))
         images = values.get("images")
         if not isinstance(images, list) or not 1 <= len(images) <= 2:
             raise ValueError("Lade ein oder zwei Bilder hoch.")
         seconds = values.get("seconds", 8)
-        if type(seconds) is not int or seconds < 1 or seconds > (2**53 - 2) // 24:
+        if type(seconds) is not int or seconds < 1 or seconds > (2**53 - 9) // options['fps']:
             raise ValueError("Gib eine positive ganze Zahl für die Videolänge in Sekunden ein.")
         with self.setup_lock, self.runner.lock:
+            if self.runner.busy:
+                raise ValueError('Eine Erstellung läuft bereits. Warte oder brich sie ab.')
             if self.updating:
                 raise ValueError("Das Programm wird gerade aktualisiert. Warte kurz auf den Neustart.")
             if self.setup and self.setup.get("state") == "running":
@@ -121,9 +128,28 @@ class Studio:
                 path = directory / f"bild-{index + 1}.jpg"
                 normalize_image(value, path)
                 paths.append(path)
-            settings = build_settings(scene, speech, sounds, paths, seconds, secrets.randbelow(2**31), direct_prompt)
-            atomic_json(directory / "eingaben.json", {"scene": scene, "speech": speech, "sounds": sounds, "seconds": seconds, "direct_prompt":direct_prompt})
+            with Image.open(paths[0]) as image:
+                profile = resolve_profile(options, image.size)
+            for path in paths:
+                prepare_reference(path, path, profile)
+            settings = build_settings(scene, speech, sounds, paths, seconds, secrets.randbelow(2**31), direct_prompt, profile)
+            atomic_json(directory / 'export.json', profile)
+            atomic_json(directory / "eingaben.json", {"scene": scene, "speech": speech, "sounds": sounds, "seconds": seconds, "direct_prompt":direct_prompt, 'output': options})
             return self.runner.start(job_id, settings, bool(speech.strip() or sounds.strip()))
+
+    def create_episode(self, values):
+        recipe = self.library.recipe(values)
+        with self.setup_lock, self.runner.lock:
+            if self.runner.busy or self.updating or (self.setup and self.setup.get('state') == 'running'):
+                raise ValueError('Warte auf die laufende Erstellung, Einrichtung oder Aktualisierung.')
+            if any(shot['kind'] == 'generate' for shot in recipe['shots']) and check_engine(self.engine, self.manifest):
+                raise ValueError('Richte zuerst die Video-KI ein.')
+            job_id = time.strftime('%Y%m%d-%H%M%S-') + secrets.token_hex(4)
+            directory = self.data / 'jobs' / job_id
+            directory.mkdir()
+            atomic_json(directory / 'episode.json', recipe)
+            profile, plan = self.library.plan(recipe, directory)
+            return self.runner.start_plan(job_id, profile, plan, recipe['title'])
 
     def begin_setup(self):
         from setup_engine import install
@@ -213,10 +239,18 @@ class Handler(BaseHTTPRequestHandler):
                 if len(result) == 12:
                     break
             return self.respond(result)
-        media = re.fullmatch(r"/media/(\d{8}-\d{6}-[0-9a-f]{8})/(video\.mp4|bild-[12]\.jpg)", path)
+        if path == '/api/library':
+            if not self.authenticated():
+                return self.respond({'error': 'Zugriff verweigert.'}, 403)
+            return self.respond({'characters': self.studio.library.records('characters'),
+                                 'episodes': self.studio.library.records('episodes'), 'clips': self.studio.library.clips()})
+        media = re.fullmatch(r"/media/(\d{8}-\d{6}-[0-9a-f]{8})/((?:shots/[0-9]{3}/)?(?:video\.(?:mp4|webm)|bild-[12]\.jpg|live-preview\.jpg))", path)
         if media:
             return self.send_file(self.studio.data / "jobs" / media[1] / media[2], download="download" in urlsplit(self.path).query)
-        static = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css", "/favicon.svg": "favicon.svg"}
+        library = re.fullmatch(r'/library/(images|clips)/([0-9a-f]{32})\.(jpg|mp4)', path)
+        if library and (library[1], library[3]) in (('images', 'jpg'), ('clips', 'mp4')):
+            return self.send_file(self.studio.data / library[1] / (library[2]+'.'+library[3]))
+        static = {"/": "index.html", "/app.js": "app.js", '/episodes.js': 'episodes.js', "/style.css": "style.css", "/favicon.svg": "favicon.svg"}
         if path in static:
             return self.send_file(RESOURCES / "web" / static[path])
         return self.respond({"error": "Nicht gefunden."}, 404)
@@ -228,7 +262,7 @@ class Handler(BaseHTTPRequestHandler):
         start, end, code = 0, size - 1, 200
         extra = {"Accept-Ranges": "bytes"}
         if download:
-            extra["Content-Disposition"] = 'attachment; filename="Mein-KI-Video.mp4"'
+            extra["Content-Disposition"] = f'attachment; filename="Mein-KI-Video{file.suffix}"'
         value = self.headers.get("Range")
         if value:
             match = re.fullmatch(r"bytes=(\d*)-(\d*)", value)
@@ -262,6 +296,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.authenticated():
             return self.respond({"error": "Die Sitzung ist abgelaufen. Lade die Seite neu."}, 403)
+        if urlsplit(self.path).path == '/api/import-clip':
+            return self.import_clip()
         if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
             return self.respond({"error": "Ungültige Anfrage."}, 415)
         try:
@@ -277,6 +313,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(self.studio.create(values), 202)
             if path == "/api/preview-prompt":
                 return self.respond(self.studio.preview_prompt(values))
+            if path == '/api/images':
+                return self.respond(self.studio.library.image(values.get('image')))
+            if path == '/api/characters':
+                return self.respond(self.studio.library.character(values))
+            if path == '/api/frame':
+                return self.respond(self.studio.library.frame(values))
+            if path == '/api/save-episode':
+                return self.respond(self.studio.library.save(values))
+            if path == '/api/generate-episode':
+                return self.respond(self.studio.create_episode(values), 202)
             if path == "/api/cancel":
                 self.studio.runner.cancel()
             elif path == "/api/check-updates":
@@ -314,6 +360,31 @@ class Handler(BaseHTTPRequestHandler):
             import traceback
             (self.studio.data / "frontend-fehler.log").write_text(traceback.format_exc(), encoding="utf-8")
             return self.respond({"error": "Die Anfrage konnte nicht verarbeitet werden. Versuche es erneut."}, 500)
+
+    def import_clip(self):
+        # Stream the body to disk; large videos never occupy a single RAM buffer.
+        target = None
+        try:
+            length = int(self.headers.get('Content-Length', '0'))
+            if not 0 < length <= 1024**3:
+                return self.respond({'error': 'Ein importierter Clip darf höchstens 1 GB groß sein.'}, 413)
+            identifier = secrets.token_hex(16)
+            target = self.studio.data / 'clips' / (identifier + '.mp4')
+            self.connection.settimeout(60)
+            with target.open('wb') as stream:
+                left = length
+                while left:
+                    block = self.rfile.read(min(left, 256 * 1024))
+                    if not block:
+                        raise ValueError('Der Upload wurde unterbrochen.')
+                    stream.write(block)
+                    left -= len(block)
+            result = self.studio.library.register_clip(identifier, unquote(self.headers.get('X-Clip-Name', 'Importierter Clip')))
+            return self.respond(result, 201)
+        except (ValueError, TimeoutError, OSError, subprocess.SubprocessError) as exc:
+            if target:
+                target.unlink(missing_ok=True)
+            return self.respond({'error': str(exc)}, 400)
 
 
 def main():

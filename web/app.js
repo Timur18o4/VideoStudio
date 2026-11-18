@@ -3,6 +3,7 @@ const $ = id => document.getElementById(id);
 let token = "", state = null, images = [null, null], imageURLs = [null, null], currentVideo = "", sending = false;
 let db = null;
 let previewSequence = 0, previewTimer = null;
+let displayedDoneID = '';
 
 async function api(path, values, retried = false) {
   const response = await fetch(path, {method: values === undefined ? "GET" : "POST", headers: {"X-Studio-Token": token, ...(values === undefined ? {} : {"Content-Type": "application/json"})}, ...(values === undefined ? {} : {body: JSON.stringify(values)})});
@@ -83,15 +84,18 @@ function schedulePreview() {
   },200);
 }
 $('prompt-preview').addEventListener('toggle',schedulePreview);
-function showVideo(url, seconds) {
+function showVideo(url, seconds, output) {
   if (currentVideo !== url) { $("video").src = url; currentVideo = url; }
   $("video").hidden = false; $("video-placeholder").hidden = true;
   $("download").href = url + "?download=1"; $("download").hidden = false;
-  $("result-meta").textContent = `${seconds} Sekunden · MP4`;
+  const extension = url.endsWith('.webm') ? 'webm' : 'mp4';
+  $('download').download='Mein-KI-Video.'+extension;
+  $("result-meta").textContent = `${Number(Number(seconds).toFixed(3))} s · ${output ? `${output.width} × ${output.height} · ${output.fps} FPS · ` : ''}${extension.toUpperCase()}`;
 }
 async function refresh() {
   try {
     const previous = state?.job?.state;
+    const previousJob = state?.job?.id;
     const next = await api("/api/state");
     if (state && state.version !== next.version) { saveDraft(); location.reload(); return; }
     state = next;
@@ -111,6 +115,7 @@ async function refresh() {
     $("repair").disabled = settingUp || active();
     if (state.setup?.state === "done" && state.ready) $("setup-panel").hidden = true;
     const job = state.job;
+    if(active() && job.id!==previousJob) {$('video').hidden=true;$('video-placeholder').hidden=false;currentVideo='';}
     $('submitted-prompt').hidden = !job?.submitted_prompt;
     $('submitted-prompt-text').value = job?.submitted_prompt || '';
     if (job) {
@@ -122,11 +127,12 @@ async function refresh() {
       if (job.progress != null) $("job-progress").value = job.progress; else $("job-progress").removeAttribute("value");
       $("cancel").hidden = !active(); $("cancel").disabled = job.state === "cancelling";
       $("elapsed").textContent = active() ? `Läuft seit ${Math.floor((Date.now() / 1000 - job.created) / 60)} Min. · Du kannst diese Seite offen lassen.` : "";
-      if (job.state === "done") { showVideo(job.video, job.seconds); if (previous !== "done") loadHistory(); }
+      if (job.state === "done") { if(displayedDoneID!==job.id) {showVideo(job.video, job.seconds, job.output);displayedDoneID=job.id;loadHistory();window.episodes && reloadLibrary().catch(()=>{});} }
       else if (active()) { $("download").hidden = true; $("result-meta").textContent = "Wird erstellt"; }
       else { $("result-meta").textContent = currentVideo ? "Gespeichertes Video" : "Vorschau"; }
     }
     updateButton();
+    window.episodes?.updateState();
   } catch (exc) {
     if (state?.update?.state === 'installing' || state?.update?.state === 'ready') $('update-footer').textContent = 'Aktualisierung läuft. Verbindung wird wiederhergestellt …';
     else error("Verbindung zum lokalen Studio unterbrochen. Starte das Programm bei Bedarf erneut.");
@@ -141,7 +147,7 @@ async function loadHistory() {
       const thumbnail = document.createElement("img"); thumbnail.src = `/media/${item.id}/bild-1.jpg`; thumbnail.alt = "";
       const text = document.createElement("span"); text.textContent = new Date(item.created * 1000).toLocaleString("de-DE", {dateStyle:"short",timeStyle:"short"});
       const small = document.createElement("small"); small.textContent = `${item.seconds} Sekunden · Auf deinem PC`; text.append(small);
-      button.append(thumbnail, text); button.addEventListener("click", () => { showVideo(item.video, item.seconds); $("video").scrollIntoView({behavior:"smooth",block:"nearest"}); }); $("history-list").append(button);
+      button.append(thumbnail, text); button.addEventListener("click", () => { showVideo(item.video, item.seconds, item.output); $("video").scrollIntoView({behavior:"smooth",block:"nearest"}); }); $("history-list").append(button);
     }
     if (!items.length) { const p = document.createElement("p"); p.className = "muted small"; p.textContent = "Deine fertigen Videos erscheinen hier."; $("history-list").append(p); }
   } catch (_) {}
@@ -161,7 +167,7 @@ $("create-form").addEventListener("submit", async event => {
   if (!images[0]) {error("Lade zuerst ein Startbild hoch."); $("image-start").focus(); return;}
   sending = true; updateButton(); saveDraft();
   try {
-    const values = {...promptValues(),seconds:Number($("seconds").value),images:await Promise.all(images.filter(Boolean).map(encode))};
+    const values = {...promptValues(),seconds:Number($("seconds").value),images:await Promise.all(images.filter(Boolean).map(encode)),output:window.episodes?.outputValues()};
     await api("/api/generate", values); await refresh();
   } catch (exc) {error(exc.message);} finally {sending = false; updateButton();}
 });
@@ -177,7 +183,7 @@ async function init() {
     token = (await api("/api/session")).token;
     restoreDraft(); db = await openDB();
     for (const index of [0,1]) {const file=await readPicture(index); if(file) await setPicture(index,file,false);}
-    await refresh(); await loadHistory(); setInterval(refresh, 2500);
+    await refresh(); await loadHistory(); await window.episodes?.init(); setInterval(refresh, 1500);
   } catch(exc) {error("Das lokale Studio konnte nicht geladen werden. Starte es bitte erneut.");}
 }
 init();

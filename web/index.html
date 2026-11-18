@@ -5,6 +5,7 @@
   <title>Video Studio · Lokal</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
+  <script src="/episodes.js" defer></script>
 </head>
 <body>
 <div class="app">
@@ -15,6 +16,14 @@
       <div><h2 id="setup-heading">Einmal einrichten. Danach lokal erstellen.</h2><p id="setup-description">Die KI-Dateien werden einmal heruntergeladen. Deine Bilder bleiben auf deinem PC.</p><p id="setup-message" role="status"></p><progress id="setup-progress" hidden></progress></div>
       <button class="primary" id="setup-start" type="button">KI einrichten</button>
     </section>
+    <div class="output-settings panel" aria-label="Videoeinstellungen">
+      <label>Bildformat<select id="output-aspect"><option value="auto">Wie das Startbild</option><option>16:9</option><option>9:16</option><option>1:1</option><option>4:3</option><option>3:4</option><option>21:9</option></select></label>
+      <label>Auflösung<select id="output-resolution"><option value="480">480p · schneller</option><option value="720">720p · HD</option><option value="1080">1080p · Full HD</option></select></label>
+      <label>Bildrate<select id="output-fps"><option>16</option><option selected>24</option><option>25</option><option>30</option><option>48</option><option>50</option><option>60</option></select></label>
+      <label>Dateiformat<select id="output-container"><option value="mp4">MP4</option><option value="webm">WebM</option></select></label>
+      <p class="hint">Gilt für alle Szenen. Höhere Auflösung und FPS brauchen mehr Zeit und Speicher. 480p/720p/1080p bezeichnen die kurze Bildkante. Andere Bildformate erhalten bei Bedarf Ränder.</p>
+    </div>
+    <div class="mode-switch" role="tablist" aria-label="Erstellungsmodus"><button id="mode-single" type="button" role="tab" aria-selected="true" aria-controls="create-form">Einzelclip</button><button id="mode-episode" type="button" role="tab" aria-selected="false" aria-controls="episode-editor">Episode &amp; Charaktere</button></div>
     <div class="workspace">
       <form id="create-form" class="panel editor">
         <section aria-labelledby="pictures-title"><div class="section-heading"><h2 id="pictures-title"><span class="step">1</span> Dein Model</h2><span class="muted small">JPG, PNG oder WebP</span></div>
@@ -31,10 +40,39 @@
         <p class="hint" id="duration-hint">Dauer frei eingeben. Längere Videos brauchen mehr Rechenzeit und Speicherplatz.</p>
         <p class="error" id="form-error" role="alert" hidden></p>
       </form>
+      <section id="episode-editor" class="panel editor" hidden aria-label="Episodenregie">
+        <div class="section-heading"><h2>Deine Episode</h2><span id="episode-total" class="optional">30 Sekunden · 5 Szenen</span></div>
+        <p class="hint">Ein Kamerawechsel = eine Szene. Die Szenen werden nacheinander erstellt und automatisch verbunden.</p>
+        <label class="field-label" for="episode-title">Titel</label><input id="episode-title" maxlength="120" value="Meine erste Episode">
+        <div class="episode-load"><select id="saved-episodes" aria-label="Gespeicherte Episode"><option value="">Gespeicherte Episode wählen …</option></select><button id="episode-load" class="secondary" type="button">Laden</button><button id="episode-new" class="quiet" type="button">Als neue Folge</button></div>
+        <details class="library-panel"><summary>Charaktere &amp; vorhandene Clips</summary>
+          <p class="hint">Ein gespeichertes Referenzbild hilft bei wiederkehrenden Hauptfiguren. Gesicht, Körper und Bewegung können zwischen Aufnahmen abweichen. Für mehrere Figuren nutze ein gemeinsames Szenenbild.</p>
+          <label class="field-label" for="character-select">Charaktervorlage</label><select id="character-select"><option value="">Neuen Charakter anlegen …</option></select>
+          <label class="field-label" for="character-name">Name</label><input id="character-name" maxlength="100" placeholder="Zum Beispiel: Mara">
+          <label class="field-label" for="character-description">Wiederkehrende Merkmale · optional</label><textarea id="character-description" rows="2" maxlength="1000" placeholder="Zum Beispiel: lange dunkle Haare, rote Jacke. Diese Merkmale werden der Szenenbeschreibung angehängt."></textarea>
+          <label class="field-label" for="character-image">Referenzbild</label><input id="character-image" type="file" accept="image/jpeg,image/png,image/webp"><img id="character-preview" class="reference-thumb" alt="Charakterreferenz" hidden>
+          <button id="character-save" class="secondary" type="button">Charakter speichern</button>
+          <hr><label class="field-label" for="clip-import">Vorhandenes Video importieren · bis 1 GB</label><input id="clip-import" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-matroska,.mkv,.mov">
+          <p id="library-message" class="hint" role="status"></p>
+          <label class="field-label" for="frame-clip">Standbild aus einem Clip übernehmen</label><select id="frame-clip"><option value="">Clip wählen …</option></select>
+          <div class="inline-fields"><label>Zeitpunkt in Sekunden<input id="frame-at" type="number" min="0" step="0.1" value="0"></label><button id="frame-extract" class="secondary" type="button">Standbild holen</button></div>
+          <video id="source-clip" controls playsinline preload="metadata" hidden aria-label="Vorhandener Clip"></video>
+          <div id="frame-result" hidden><img id="frame-image" class="reference-thumb" alt="Übernommenes Standbild"><button id="frame-character" class="quiet" type="button">Als Charakterbild</button><button id="frame-scene" class="quiet" type="button">Neue Szene mit diesem Bild</button></div>
+        </details>
+        <div class="episode-distribute"><label>Gesamtlänge in Sekunden<input id="episode-duration" type="number" min="1" step="1" value="30"></label><button id="episode-distribute" class="secondary" type="button">Auf Szenen verteilen</button></div>
+        <div id="scene-list"></div>
+        <button id="scene-add" class="secondary" type="button">＋ Szene hinzufügen</button>
+        <div class="episode-actions"><button id="episode-save" class="secondary" type="button">Episode speichern</button><button id="episode-generate" class="primary" type="button">▷ Episode erstellen</button></div>
+        <p id="episode-message" class="hint" role="status"></p>
+        <p id="episode-error" class="error" role="alert" hidden></p>
+      </section>
       <aside class="result-column">
         <section class="panel result" aria-labelledby="result-title"><div class="section-heading"><h2 id="result-title">Dein Video</h2><span class="muted small" id="result-meta">Vorschau</span></div>
           <div class="video-stage"><div id="video-placeholder" class="video-placeholder"><div class="placeholder-frame" aria-hidden="true"><span>▷</span></div><h3>Deine Idee wird bewegt.</h3><p>Hier erscheint dein fertiges Video.<br>Die Erstellung kann mehrere Minuten dauern.</p></div><video id="video" controls playsinline preload="metadata" hidden aria-label="Vorschau deines KI-Videos"></video></div>
           <div class="job-status" id="job-status" hidden><div class="status-heading"><span id="status-icon" aria-hidden="true"></span><p id="job-message" role="status" aria-live="polite"></p></div><progress id="job-progress" max="100"></progress><div class="status-bottom"><span id="elapsed" class="muted small"></span><button class="quiet" id="cancel" type="button" hidden>Abbrechen</button></div></div>
+          <div id="render-preview" hidden><p class="field-label">Live-Zwischenbilder</p><img id="render-preview-image" alt="Grobe Zwischenbilder der laufenden KI-Berechnung"><p class="hint">Rohvorschau während der Berechnung. Farben und Details können stark vom fertigen Video abweichen.</p></div>
+          <p id="render-preview-note" class="hint"></p>
+          <div id="shot-progress" aria-label="Fortschritt der Szenen"></div>
           <a id="download" class="primary download" hidden download="Mein-KI-Video.mp4">Video speichern <span aria-hidden="true">↓</span></a>
           <details id="submitted-prompt" class="prompt-details" hidden><summary>Verwendeter Text dieses Auftrags</summary><textarea id="submitted-prompt-text" rows="6" readonly aria-label="Tatsächlich gesendeter Text"></textarea></details>
         </section>

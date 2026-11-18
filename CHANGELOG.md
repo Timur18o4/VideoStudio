@@ -1,5 +1,17 @@
 # Änderungen
 
+## 0.2.2-preview
+
+- Episodenregie mit dynamischer Szenenanzahl, eigenen Start-/Schlussbildern, Anweisungen, Sprache, Geräuschen und Dauer je Szene; Szenen lassen sich umordnen.
+- Gesamtlänge auf Szenen verteilen, beispielsweise 30 Sekunden auf fünf Kameraeinstellungen.
+- Charakterbibliothek mit Referenzbild und optionalen wiederkehrenden Merkmalen. Kein zusätzliches Training und keine Garantie identischer Figuren.
+- Episodenvorlagen lokal speichern, später laden und als neue Folge weiterverwenden.
+- Vorhandene Videos importieren, Ausschnitte wiederverwenden und Standbilder als neue Referenzen übernehmen.
+- Einheitliche Ausgabe nach Bildformat, 480p/720p/1080p, FPS und MP4/WebM; Bildzahl und Länge werden beim Export angepasst.
+- Grobe RGB-Zwischenbilder aus der laufenden WanGP-Berechnung ohne neue Modelle; fertige Szenen sofort ansehen und speichern.
+- Abbrechen beendet den eigenen Render-/Exportprozess einschließlich Unterprozessen; bereits fertige Szenen bleiben erhalten.
+- Videomodell und Textencoder bleiben auf dem Stand der 0.2.1-Version.
+
 ## 0.2.1-preview
 
 - Direkte Szenenbeschreibung standardmäßig aktiv; bisherige Stil- und Kleidungsvorgaben sind optional.

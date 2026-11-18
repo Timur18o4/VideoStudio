@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import json
+import copy
 import os
 import re
 import shutil
 import subprocess
 import threading
 import time
+import sys
+import secrets
 from pathlib import Path
 
 MODEL = "ltx2_22B_distilled_gguf_q4_k_m"
@@ -17,7 +20,7 @@ CREATE_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
 def atomic_json(path: Path, value):
-    temporary = path.with_suffix(".tmp")
+    temporary = path.with_name(path.name + '.' + secrets.token_hex(4) + '.tmp')
     temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
     temporary.replace(path)
 
@@ -52,15 +55,19 @@ def compose_prompt(scene: str, speech: str, sounds: str, direct_prompt=True, has
     return prompt
 
 
-def build_settings(scene: str, speech: str, sounds: str, images: list[Path], seconds: int, seed: int, direct_prompt=True):
+def build_settings(scene: str, speech: str, sounds: str, images: list[Path], seconds: int, seed: int, direct_prompt=True, profile=None):
     from PIL import Image
     with Image.open(images[0]) as image:
         width, height = image.size
     resolution = "512x896" if height > width * 1.15 else "896x512" if width > height * 1.15 else "640x640"
+    fps = profile['fps'] if profile else 24
+    frames = round(seconds * fps)
+    if profile:
+        resolution = 'x'.join(str(max(32, round(profile[key] / 32) * 32)) for key in ('width', 'height'))
     prompt = compose_prompt(scene, speech, sounds, direct_prompt, len(images) == 2)
     result = {
         "model_type": MODEL, "prompt": prompt, "resolution": resolution,
-        "video_length": seconds * 24 + 1, "num_inference_steps": 8,
+        "video_length": ((frames + 7) // 8) * 8 + 1, "num_inference_steps": 8,
         "seed": seed, "prompt_enhancer": "", "image_prompt_type": "SE" if len(images) == 2 else "S",
         "image_start": str(images[0].resolve()), "audio_prompt_type": "",
         "audio_guide": None,
@@ -69,6 +76,8 @@ def build_settings(scene: str, speech: str, sounds: str, images: list[Path], sec
         "sliding_window_size": WINDOW_FRAMES,
         "sliding_window_overlap": WINDOW_OVERLAP,
     }
+    if profile:
+        result['force_fps'] = str(fps)
     if len(images) == 2:
         result["image_end"] = str(images[1].resolve())
     return result
@@ -102,6 +111,10 @@ class Runner:
                 status = json.loads(file.read_text(encoding="utf-8"))
                 if status["state"] in ("queued", "running", "cancelling"):
                     status.update(state="interrupted", message="Die Erstellung wurde unterbrochen. Du kannst ein neues Video starten.")
+                    status['live_preview'] = None
+                    for shot in status.get('shots', []):
+                        if shot['state'] in ('queued', 'running'):
+                            shot['state'] = 'interrupted'
                     atomic_json(file, status)
                 if self.last is None:
                     self.last = status
@@ -110,7 +123,7 @@ class Runner:
 
     def snapshot(self):
         with self.lock:
-            return dict(self.current or self.last) if self.current or self.last else None
+            return copy.deepcopy(self.current or self.last)
 
     def update(self, **values):
         with self.lock:
@@ -118,88 +131,159 @@ class Runner:
             atomic_json(self.data / "jobs" / self.current["id"] / "status.json", self.current)
 
     def start(self, job_id, settings, audible):
+        from media import resolve_profile
+        from PIL import Image
+        job = self.data / 'jobs' / job_id
+        if (job / 'export.json').is_file():
+            profile = json.loads((job / 'export.json').read_text(encoding='utf-8'))
+            seconds = json.loads((job / 'eingaben.json').read_text(encoding='utf-8'))['seconds']
+        else:
+            with Image.open(settings['image_start']) as image:
+                profile = resolve_profile(None, image.size)
+            seconds = (settings['video_length'] - 1) / int(settings.get('force_fps', 24))
+        plan = [{'kind': 'generate', 'settings': settings, 'audible': audible,
+                 'seconds': seconds, 'frames': round(seconds * profile['fps'])}]
+        return self.start_plan(job_id, profile, plan)
+
+    def start_plan(self, job_id, profile, plan, title=None):
         with self.lock:
             if self.busy:
                 raise ValueError("Ein Video wird bereits erstellt. Bitte warte oder brich es ab.")
-            missing = check_engine(self.engine, self.manifest)
+            missing = check_engine(self.engine, self.manifest) if any(shot['kind'] == 'generate' for shot in plan) else []
             if missing:
                 raise ValueError("Die KI ist noch nicht vollständig eingerichtet. Starte zuerst die Einrichtung.")
             job = self.data / "jobs" / job_id
-            atomic_json(job / "settings.json", settings)
+            for index, shot in enumerate(plan, 1):
+                folder = job / 'shots' / f'{index:03}'
+                folder.mkdir(parents=True, exist_ok=True)
+                if shot.get('settings'):
+                    atomic_json(folder / 'settings.json', shot['settings'])
+            atomic_json(job / 'plan.json', {'output': profile, 'shots': plan})
             self.current = {"id": job_id, "state": "queued", "message": "Die KI wird gestartet …", "progress": None,
-                            "created": time.time(), "seconds": (settings["video_length"] - 1) // 24,
-                            "submitted_prompt": settings["prompt"]}
+                            "created": time.time(), "seconds": sum(shot['frames'] for shot in plan) / profile['fps'],
+                            "title": title, 'output': profile, 'shot_index': 0,
+                            'shots': [{'state': 'queued', 'seconds': shot['seconds'], 'kind': shot['kind']} for shot in plan],
+                            "submitted_prompt": '\n\n'.join(f"Szene {i+1}:\n{shot['settings']['prompt']}" for i, shot in enumerate(plan) if shot.get('settings'))}
             self.update()
             self.busy = True
-            threading.Thread(target=self.run, args=(job, audible), daemon=True).start()
-            return dict(self.current)
+            threading.Thread(target=self.run, args=(job, profile, plan), daemon=True).start()
+            return self.snapshot()
 
-    def run(self, job, audible):
-        process = None
+    def cancelled(self):
+        with self.lock:
+            if self.current['state'] == 'cancelling':
+                raise RuntimeError('Erstellung abgebrochen.')
+
+    def shot_update(self, index, **values):
+        with self.lock:
+            self.current['shots'][index].update(values)
+            self.update()
+
+    def run(self, job, profile, plan):
+        from media import binary, final_command, normalize_command
         try:
-            env = os.environ.copy()
-            env.update(PYTHONUTF8="1", PYTHONIOENCODING="utf-8", HF_HUB_OFFLINE="1",
-                       HF_HUB_DISABLE_TELEMETRY="1", GRADIO_ANALYTICS_ENABLED="False", DO_NOT_TRACK="1")
-            env.pop("PYTHONHOME", None)
-            env.pop("PYTHONPATH", None)
-            command = [str(engine_python(self.engine)), "-u", "wgp.py", "--offline", "--profile", "4",
-                       "--no-mcp-webui", "--attention", "sdpa", "--process", str(job / "settings.json"),
-                       "--output-dir", str(job / "render")]
+            audible = any(shot['audible'] for shot in plan)
+            for index, shot in enumerate(plan):
+                folder = job / 'shots' / f'{index+1:03}'
+                with self.lock:
+                    self.cancelled()
+                    self.update(state='running', shot_index=index, progress=index / len(plan) * 95,
+                                live_preview=None, message=f'Szene {index+1} von {len(plan)} wird vorbereitet …')
+                self.shot_update(index, state='running')
+                source = Path(shot['source']) if shot['kind'] == 'clip' else self.render_shot(folder)
+                self.cancelled()
+                self.update(message=f'Szene {index+1} von {len(plan)} wird gespeichert …')
+                self.postprocess(normalize_command(self.engine, source, folder / 'video.mp4', profile,
+                                 shot['frames'], audible, shot.get('start', 0), shot['audible']), job)
+                self.cancelled()
+                if index == 0 and not (job / 'bild-1.jpg').is_file():
+                    self.postprocess([binary(self.engine, 'ffmpeg'), '-v', 'error', '-nostdin', '-y', '-i',
+                                      str(folder / 'video.mp4'), '-frames:v', '1', '-vf',
+                                      'scale=512:512:force_original_aspect_ratio=decrease', str(job / 'bild-1.jpg')], job)
+                self.shot_update(index, state='done', video=f'/media/{job.name}/shots/{index+1:03}/video.mp4')
+                self.update(progress=(index+1) / len(plan) * 95)
+            self.cancelled()
+            self.update(message='Die Szenen werden zur Episode zusammengesetzt …', progress=96, live_preview=None)
+            concat = job / 'szenen.txt'
+            concat.write_text(''.join(f"file 'shots/{index+1:03}/video.mp4'\n" for index in range(len(plan))), encoding='utf-8')
+            command = [binary(self.engine, 'ffmpeg'), '-v', 'warning', '-nostdin', '-y', '-copyts', '-f', 'concat', '-safe', '1',
+                       '-i', str(concat), '-c', 'copy', '-movflags', '+faststart', str(job / 'video.mp4')]
+            self.postprocess(command, job)
+            container = profile['container']
+            if container == 'webm':
+                self.update(message='WebM-Datei wird erstellt …', progress=98)
+                self.postprocess(final_command(self.engine, job / 'video.mp4', job / 'video.webm', container), job)
             with self.lock:
-                if self.current["state"] == "cancelling":
-                    self.update(state="cancelled", message="Erstellung abgebrochen.")
-                    return
-                self.update(state="running", message="Die KI lädt die Bilder und bereitet das Video vor …")
-                process = subprocess.Popen(command, cwd=self.engine, env=env, stdout=subprocess.PIPE,
-                                           stderr=subprocess.STDOUT, creationflags=CREATE_FLAGS)
-                self.proc = process
-            with (job / "diagnose.log").open("w", encoding="utf-8") as log:
-                # tqdm writes carriage-return progress. Read bounded chunks, not only newlines.
-                buffer = bytearray()
-                while True:
-                    chunk = process.stdout.read(1)
-                    if not chunk:
-                        break
-                    if chunk in (b"\r", b"\n") or len(buffer) > 16000:
-                        line = buffer.decode("utf-8", errors="replace")
-                        log.write(line + "\n")
-                        log.flush()
-                        self.parse_progress(line)
-                        buffer.clear()
-                    else:
-                        buffer.extend(chunk)
-                if buffer:
-                    log.write(buffer.decode("utf-8", errors="replace"))
-            code = process.wait()
-            with self.lock:
-                if self.current["state"] == "cancelling":
-                    self.update(state="cancelled", message="Erstellung abgebrochen.", progress=None)
-                    return
-            outputs = sorted((job / "render").rglob("*.mp4"), key=lambda p: p.stat().st_mtime)
-            if code != 0 or not outputs:
-                raise RuntimeError(self.friendly_error(job / "diagnose.log"))
-            source = outputs[-1]
-            target = job / "video.mp4"
-            if audible:
-                shutil.copyfile(source, target)
-            else:
-                ffmpeg = self.engine / "ffmpeg_bins" / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
-                command = [str(ffmpeg), "-y", "-i", str(source), "-c:v", "copy", "-an", "-movflags", "+faststart", str(target)]
-                self.postprocess(command, job)
-            self.update(state="done", message="Dein Video ist fertig.", progress=100, video=f"/media/{job.name}/video.mp4")
+                self.cancelled()
+                self.update(state='done', message='Deine Episode ist fertig.' if len(plan)>1 else 'Dein Video ist fertig.',
+                            progress=100, video=f'/media/{job.name}/video.{container}')
         except Exception as exc:
             with self.lock:
-                cancelled = self.current["state"] == "cancelling"
-            self.update(state="cancelled" if cancelled else "error", progress=None,
-                        message="Erstellung abgebrochen." if cancelled else str(exc))
+                cancelled = self.current['state'] == 'cancelling'
+                for shot in self.current['shots']:
+                    if shot['state'] in ('queued', 'running'):
+                        shot['state'] = 'cancelled' if cancelled else 'interrupted'
+            self.update(state='cancelled' if cancelled else 'error', progress=None,
+                        message='Erstellung abgebrochen. Fertige Szenen bleiben erhalten.' if cancelled else str(exc))
         finally:
+            # An unexpected log/export error must not leave a child rendering.
+            proc = self.proc
+            if proc and proc.poll() is None:
+                self.stop_process(proc)
+            if proc and proc.stdout:
+                proc.stdout.close()
             with self.lock:
                 self.proc = None
-                self.last = dict(self.current)
+                self.last = copy.deepcopy(self.current)
                 self.busy = False
 
+    def render_shot(self, folder):
+        self.cancelled()
+        env = os.environ.copy()
+        env.update(PYTHONUTF8="1", PYTHONIOENCODING="utf-8", HF_HUB_OFFLINE="1",
+                   HF_HUB_DISABLE_TELEMETRY="1", GRADIO_ANALYTICS_ENABLED="False", DO_NOT_TRACK="1")
+        env.pop("PYTHONHOME", None)
+        env.pop("PYTHONPATH", None)
+        worker = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)) / 'preview_worker.py'
+        command = [str(engine_python(self.engine)), '-u', str(worker), str(self.engine), str(folder / 'live-preview.jpg'),
+                   "--offline", "--profile", "4", "--no-mcp-webui", "--attention", "sdpa",
+                   "--process", str(folder / "settings.json"), "--output-dir", str(folder / "render")]
+        with self.lock:
+            self.cancelled()
+            process = subprocess.Popen(command, cwd=self.engine, env=env, stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT, creationflags=CREATE_FLAGS)
+            self.proc = process
+        job = folder.parents[1]
+        with (job / "diagnose.log").open("a", encoding="utf-8") as log:
+            # tqdm writes carriage-return progress. Read bounded chunks, not only newlines.
+            buffer = bytearray()
+            while True:
+                chunk = process.stdout.read(1)
+                if not chunk:
+                    break
+                if chunk in (b"\r", b"\n") or len(buffer) > 16000:
+                    line = buffer.decode("utf-8", errors="replace")
+                    log.write(line + "\n")
+                    log.flush()
+                    self.parse_progress(line)
+                    if '[STUDIO_PREVIEW]' in line:
+                        self.update(live_preview=f'/media/{job.name}/shots/{folder.name}/live-preview.jpg?v={time.time_ns()}')
+                    elif '[STUDIO_PREVIEW_UNAVAILABLE]' in line:
+                        self.update(preview_note='Die Zwischenbildvorschau ist hier nicht verfügbar. Fertige Szenen erscheinen unten.')
+                    buffer.clear()
+                else:
+                    buffer.extend(chunk)
+            if buffer:
+                log.write(buffer.decode("utf-8", errors="replace"))
+        code = process.wait()
+        process.stdout.close()
+        self.cancelled()
+        outputs = sorted((folder / "render").rglob("*.mp4"), key=lambda p: p.stat().st_mtime)
+        if code != 0 or not outputs:
+            raise RuntimeError(self.friendly_error(job / "diagnose.log"))
+        return outputs[-1]
+
     def postprocess(self, command, job):
-        self.update(message="Das Video wird gespeichert …", progress=99)
         with self.lock, (job / "diagnose.log").open("a", encoding="utf-8") as log:
             if self.current["state"] == "cancelling":
                 raise RuntimeError("Erstellung abgebrochen.")
@@ -218,11 +302,14 @@ class Runner:
                 return
             fraction = int(match[2]) / total
             value = round(15 + fraction * 60) if total == 8 else round(75 + fraction * 20)
-            self.update(message="Dein Video wird berechnet …" if total == 8 else "Bewegung und Details werden verfeinert …", progress=None if self.current["seconds"] > 8 else value)
+            index = self.current.get('shot_index', 0)
+            shots = self.current.get('shots', [{'seconds': self.current['seconds']}])
+            overall = (index + value / 100) / len(shots) * 95
+            self.update(message=f'Szene {index+1} von {len(shots)}: ' + ("Video wird berechnet …" if total == 8 else "Details werden verfeinert …"), progress=None if shots[index]['seconds'] > 8 else overall)
         elif "Encoding Text Prompt" in line:
             self.update(message="Die KI liest deine Szenenbeschreibung …", progress=None)
         elif "VAE Decoding" in line or "Encoding Video" in line:
-            self.update(message="Bild und Ton werden gespeichert …", progress=None if self.current["seconds"] > 8 else 97)
+            self.update(message="Bild und Ton werden gespeichert …")
 
     @staticmethod
     def friendly_error(log):
@@ -242,7 +329,15 @@ class Runner:
             self.update(state="cancelling", message="Die Erstellung wird abgebrochen …")
             proc = self.proc
         if proc and proc.poll() is None:
-            if os.name == "nt":
-                subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, creationflags=CREATE_FLAGS)
-            else:
-                proc.terminate()
+            self.stop_process(proc)
+
+    @staticmethod
+    def stop_process(proc):
+        if os.name == 'nt':
+            subprocess.run(['taskkill', '/PID', str(proc.pid), '/T', '/F'], capture_output=True, creationflags=CREATE_FLAGS)
+        else:
+            proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()

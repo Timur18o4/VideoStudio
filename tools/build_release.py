@@ -50,7 +50,7 @@ for package, target in [("pillow", "Pillow"), ("pyinstaller", "PyInstaller"), ("
 python_license = Path(sys.base_prefix) / "LICENSE.txt"
 if python_license.exists():
     shutil.copyfile(python_license, licenses / "Python-LICENSE.txt")
-bundle("VideoStudio", "app.py", [(ROOT / "web", "web"), (ROOT / "models.lock.json", "."), (ROOT / "requirements-engine.lock", "."), (ROOT / "update-trust.json", ".")])
+bundle("VideoStudio", "app.py", [(ROOT / "web", "web"), (ROOT / "preview_worker.py", "."), (ROOT / "models.lock.json", "."), (ROOT / "requirements-engine.lock", "."), (ROOT / "update-trust.json", ".")])
 payload = WORK / "payload.zip"
 with zipfile.ZipFile(payload, "w", zipfile.ZIP_DEFLATED) as archive:
     archive.write(OUT / "VideoStudio.exe", "VideoStudio.exe")
@@ -64,7 +64,7 @@ shutil.copyfile(payload, update_zip)
 bundle(f"VideoStudio-Setup-{VERSION}", "installer.py", [(payload, ".")])
 source_zip = OUT / f"VideoStudio-{VERSION}-Quellcode.zip"
 with zipfile.ZipFile(source_zip, "w", zipfile.ZIP_DEFLATED) as archive:
-    for name in ("app.py", "engine.py", "setup_engine.py", "installer.py", "updater.py", "version.py", "update-trust.json", "README.md", "LICENSE.md", "THIRD_PARTY_NOTICES.md", "CHANGELOG.md", "requirements-engine.lock", "requirements-frontend.txt", "requirements-build.txt", "models.lock.json", ".gitignore", ".gitattributes"):
+    for name in ("app.py", "engine.py", "episodes.py", "media.py", "preview_worker.py", "setup_engine.py", "installer.py", "updater.py", "version.py", "update-trust.json", "README.md", "LICENSE.md", "THIRD_PARTY_NOTICES.md", "CHANGELOG.md", "requirements-engine.lock", "requirements-frontend.txt", "requirements-build.txt", "models.lock.json", ".gitignore", ".gitattributes"):
         archive.write(ROOT / name, "VideoStudio/" + name)
     for folder in ("web", "tests", "tools", "licenses", ".github"):
         for file in (ROOT / folder).rglob("*"):
